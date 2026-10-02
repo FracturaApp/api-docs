@@ -1,0 +1,240 @@
+---
+title: Modals
+description: Open a dialog with inputs, then read the values that the person submits.
+order: 24
+---
+
+A modal is a dialog with inputs. Only the person who started the interaction sees it. The person fills in the inputs and selects **Submit**. Fractura then sends a ModalSubmit interaction (type `5`) to your bot.
+
+To open a modal, send callback type `6`. You can open a modal from these interaction types: ApplicationCommand, MessageComponent, ModalSubmit, FormSubmit, and ModalComponent. You cannot open a modal from an autocomplete interaction.
+
+## Modal object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `title` | string | 1 to 45 characters. |
+| `components` | array | 1 to 10 components. |
+| `size?` | integer | `1` small, `2` medium, `3` large, or `4` extra large. The default is `2`. |
+| `steps?` | object | A step indicator. `labels` has 2 to 8 strings of 1 to 40 characters. `current` is the active step, starting at 1. |
+
+Put each input in a label (type `18`). The modal can also contain text displays, files, fields grids, and action rows with buttons. Read [Component reference](/docs/component-reference) for the inputs.
+
+The tree of a modal can have at most 3 levels.
+
+## Open a modal
+
+This example opens a modal when a person runs `/report`.
+
+<CodeGroup>
+
+```javascript
+await api("POST", `/interactions/${interaction.id}/callback`, {
+  type: 6,
+  data: {
+    customId: "report",
+    title: "Report a problem",
+    components: [
+      {
+        type: 18,
+        label: "Summary",
+        component: { type: 4, customId: "summary", style: 1, required: true, maxLength: 100 },
+      },
+      {
+        type: 18,
+        label: "Area",
+        component: {
+          type: 21,
+          customId: "area",
+          required: true,
+          options: [
+            { label: "Chat", value: "chat" },
+            { label: "Voice", value: "voice" },
+            { label: "Other", value: "other" },
+          ],
+        },
+      },
+      {
+        type: 18,
+        label: "Details",
+        description: "Tell us what you expected to happen.",
+        component: { type: 4, customId: "details", style: 2, maxLength: 2000 },
+      },
+    ],
+  },
+});
+```
+
+```python
+await api("POST", f"/interactions/{interaction['id']}/callback", {
+    "type": 6,
+    "data": {
+        "customId": "report",
+        "title": "Report a problem",
+        "components": [
+            {
+                "type": 18,
+                "label": "Summary",
+                "component": {"type": 4, "customId": "summary", "style": 1, "required": True, "maxLength": 100},
+            },
+            {
+                "type": 18,
+                "label": "Area",
+                "component": {
+                    "type": 21,
+                    "customId": "area",
+                    "required": True,
+                    "options": [
+                        {"label": "Chat", "value": "chat"},
+                        {"label": "Voice", "value": "voice"},
+                        {"label": "Other", "value": "other"},
+                    ],
+                },
+            },
+            {
+                "type": 18,
+                "label": "Details",
+                "description": "Tell us what you expected to happen.",
+                "component": {"type": 4, "customId": "details", "style": 2, "maxLength": 2000},
+            },
+        ],
+    },
+})
+```
+
+</CodeGroup>
+
+<Note>
+
+Design the modal in the [component builder](/component-builder). Add a modal page, then select **Copy JSON**. The JSON is the `data` of the callback.
+
+</Note>
+
+## Read the submit
+
+`modalData.customId` is the `customId` of the modal. `modalData.fields` has one object for each input.
+
+```json
+{
+  "customId": "report",
+  "fields": [
+    { "type": 4, "customId": "summary", "value": "Messages load slowly" },
+    { "type": 21, "customId": "area", "value": "chat" },
+    { "type": 4, "customId": "details", "value": "" }
+  ]
+}
+```
+
+<CodeGroup>
+
+```javascript
+async function handleModalSubmit(interaction) {
+  const values = Object.fromEntries(
+    interaction.modalData.fields.map((field) => [field.customId, field.value ?? field.values]),
+  );
+
+  await saveReport(values.summary, values.area, values.details);
+
+  await api("POST", `/interactions/${interaction.id}/callback`, {
+    type: 1,
+    data: { content: "Thank you. We received your report.", flags: 128 },
+  });
+}
+```
+
+```python
+async def handle_modal_submit(interaction):
+    values = {
+        field["customId"]: field.get("value", field.get("values"))
+        for field in interaction["modalData"]["fields"]
+    }
+
+    await save_report(values["summary"], values["area"], values["details"])
+
+    await api("POST", f"/interactions/{interaction['id']}/callback", {
+        "type": 1,
+        "data": {"content": "Thank you. We received your report.", "flags": 128},
+    })
+```
+
+</CodeGroup>
+
+### Submitted values
+
+| Input | Type | Field |
+| --- | --- | --- |
+| TextInput | `4` | `value`: string |
+| RadioGroup | `21` | `value`: string |
+| DatePicker | `24` | `value`: string, `YYYY-MM-DD` |
+| TimePicker | `35` | `value`: string, `HH:MM` |
+| Checkbox | `23` | `value`: boolean |
+| NumberInput | `32` | `value`: number or `null` |
+| Rating | `34` | `value`: number or `null` |
+| ColorPicker | `38` | `value`: number or `null` |
+| Slider | `33` | `value`: number |
+| StringSelect | `3` | `values`: array of strings |
+| CheckboxGroup | `22` | `values`: array of strings |
+| UserSelect | `5` | `values`: array of user ids |
+| RoleSelect | `6` | `values`: array of role ids |
+| ChannelSelect | `8` | `values`: array of channel ids |
+| StringListInput | `37` | `values`: array of strings |
+| FileUpload | `19` | `values`: array of attachment ids |
+
+For a FileUpload, the files are in `interaction.attachments`.
+
+## Show errors
+
+Send callback type `7` to keep the modal open and show errors. The values that the person entered stay in the inputs. The person can then correct them and submit again.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `message?` | string | An error for the full modal. 1 to 200 characters. |
+| `fields?` | array | Errors for inputs. Each has `customId` and `message` (1 to 200 characters). |
+
+Send `message`, `fields`, or both.
+
+```json
+{
+  "type": 7,
+  "data": {
+    "fields": [{ "customId": "summary", "message": "Enter at least 10 characters." }]
+  }
+}
+```
+
+## Steps
+
+To make a modal with more than one page, answer a ModalSubmit with a new modal (callback type `6`). The new modal replaces the old modal. Use `steps` to show the progress.
+
+```json
+{
+  "type": 6,
+  "data": {
+    "customId": "signup_2",
+    "title": "Create an account",
+    "steps": { "labels": ["Account", "Profile", "Confirm"], "current": 2 },
+    "components": [
+      {
+        "type": 18,
+        "label": "Display name",
+        "component": { "type": 4, "customId": "display_name", "style": 1, "maxLength": 32 }
+      }
+    ]
+  }
+}
+```
+
+## Buttons in a modal
+
+A modal can contain buttons in an action row. A click sends a ModalComponent interaction (type `8`). The interaction contains:
+
+- `componentData`: the button that the person clicked.
+- `modalData`: the current values of the inputs. Fractura does not check `required` or the length limits for these values.
+
+Answer with type `6` to change the modal, type `7` to show errors, or type `4` to accept the click. You cannot send a message while the modal is open.
+
+## Close and timeout
+
+If the person closes the modal, Fractura sends a ModalCancel interaction (type `6`). `modalData.fields` is empty. Do not send a callback.
+
+A person has 15 minutes to submit a modal.

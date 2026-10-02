@@ -1,0 +1,58 @@
+---
+title: Capabilities
+description: Turn on the features that your application uses.
+order: 12
+---
+
+A capability is a feature that an application can use. Turn on capabilities on the **Capabilities** page of the [developer portal](https://frta.dev). Then select **Save Changes**.
+
+A bot uses a capability in a server only when two conditions are true:
+
+1. The application has the capability.
+2. The install in that server grants the capability.
+
+The person who installs the bot can turn off each capability on the install screen. Read [Install a bot](/docs/install-a-bot).
+
+## Bot capabilities
+
+| Portal label | Install screen label | Value | Allows the bot to |
+| --- | --- | --- | --- |
+| Slash commands | Use slash commands | `slash_commands` | Register commands and receive command and autocomplete interactions. |
+| Message actions | Receive message actions | `message_actions` | Receive button, select, and form interactions. |
+| Configured channel posting | Post to configured channels | `configured_channel_posting` | Use the Send Messages permission. |
+| Read added channels | Read messages in added channels | `read_messages_in_added_channels` | Use Read Message History, and receive message events. |
+| DM users | Send direct messages | `dm_users` | Open direct messages with members of the server. |
+| Webhooks | Receive webhooks | `webhooks` | Use the Manage Webhooks permission. |
+| Admin actions | Perform admin actions | `admin_actions` | Use administrative permissions. |
+
+Without a capability, Fractura removes the related permissions from the bot. A role cannot give them back. Read [Permissions](/docs/permissions#capabilities-limit-permissions) for the full list.
+
+<Note>
+
+Interaction callbacks of type `1` and `2` also create messages. A bot that answers commands with messages needs **Configured channel posting** and the Send Messages permission.
+
+</Note>
+
+`admin_actions` is a large grant. Only a person with the Administrator permission can grant it on the install screen. Turn it on only if the bot must moderate members or manage the server.
+
+## OAuth2 capabilities
+
+These capabilities let users authorize the application. They do not give a bot any permissions. Read [OAuth2](/docs/oauth2).
+
+| Portal label | Value | Scopes |
+| --- | --- | --- |
+| User OAuth | `user_oauth` | `identify`, `identify.email` |
+| Workspace OAuth | `workspace_oauth` | `workspaces.list` |
+
+## Choose capabilities
+
+| The bot | Turn on |
+| --- | --- |
+| Answers slash commands | Slash commands and Configured channel posting |
+| Has buttons or selects | Message actions |
+| Posts messages, for example alerts | Configured channel posting |
+| Reads chat messages | Read added channels |
+| Sends direct messages | DM users |
+| Bans, kicks, or manages roles | Admin actions |
+
+Ask only for the capabilities that the bot needs.

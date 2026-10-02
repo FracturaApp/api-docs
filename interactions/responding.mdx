@@ -1,0 +1,194 @@
+---
+title: Respond to interactions
+description: Send a callback to answer an interaction, then edit the reply.
+order: 22
+---
+
+Answer each interaction with one callback. Send it with the bot token.
+
+<Endpoint method="POST" path="/interactions/:interactionId/callback" />
+
+The body has two fields:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `type` | integer | The [callback type](#callback-types). |
+| `data?` | object | The data for the callback type. Omit it for type `4`. |
+
+## Rules
+
+- Send the callback within 8 seconds after `createdAt`. For autocomplete, the limit is 3 seconds.
+- Send only one callback for each interaction.
+- Send the callback from the bot that received the interaction. A user token cannot call this route.
+- The route allows 120 callbacks each minute for each bot.
+
+If the bot breaks a rule, the request fails with one of these codes:
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `90002` | 404 | The interaction is unknown, or the deadline is past. |
+| `90003` | 400 | The interaction already has a callback. |
+| `90009` | 400 | The callback type is not valid for this interaction type. |
+
+## Callback types
+
+| Value | Name | `data` | Result |
+| --- | --- | --- | --- |
+| `1` | Message | `content`, `components`, `flags` | Sends a new message. |
+| `2` | DeferredMessage | `flags` (optional) | Sends a loading message that you edit later. |
+| `3` | UpdateMessage | `content`, `components`, `flags` | Edits the message that contains the component. |
+| `4` | DeferredUpdate | None | Accepts the interaction. You can edit the message later. |
+| `5` | AutocompleteResult | `choices` | Shows choices. Read [Autocomplete](/docs/autocomplete). |
+| `6` | Modal | A modal object | Opens a modal. Read [Modals](/docs/modals). |
+| `7` | ModalError | `message`, `fields` | Shows errors and keeps the modal open. |
+
+Callback types `1` and `2` create a message. The bot needs Send Messages in the channel, and the install must grant **Post to configured channels** (`configured_channel_posting`).
+
+For types `1` and `3`, send `content`, `components`, or both. `content` has at most 4000 characters of [Markdown](/docs/markdown). Build `components` in the [component builder](/component-builder).
+
+A callback cannot attach files or set allowed mentions. To do this, use [Create a message](/docs/messages#create-a-message) after the callback.
+
+### Allowed callbacks
+
+| Interaction type | Allowed callback types |
+| --- | --- |
+| `2` ApplicationCommand | `1`, `2`, `6` |
+| `3` MessageComponent | `1`, `2`, `3`, `4`, `6` |
+| `4` Autocomplete | `5` |
+| `5` ModalSubmit | `1`, `2`, `6`, `7` |
+| `6` ModalCancel | None |
+| `7` FormSubmit | `1`, `2`, `3`, `4`, `6` |
+| `8` ModalComponent | `4`, `6`, `7` |
+
+## Response
+
+The response has status `200`.
+
+| Callback type | Response body |
+| --- | --- |
+| `1`, `2` | `{ "messageId": "..." }`. The id of the new message. |
+| `3`, `4` | `{ "messageId": "..." }`. The id of the edited message. |
+| `5`, `6`, `7` | `{}` |
+
+## Reply with a message
+
+<CodeGroup>
+
+```javascript
+await api("POST", `/interactions/${interaction.id}/callback`, {
+  type: 1,
+  data: { content: `Hello, ${interaction.user.displayName ?? interaction.user.username}.` },
+});
+```
+
+```python
+user = interaction["user"]
+await api("POST", f"/interactions/{interaction['id']}/callback", {
+    "type": 1,
+    "data": {"content": f"Hello, {user['displayName'] or user['username']}."},
+})
+```
+
+</CodeGroup>
+
+## Ephemeral messages
+
+An ephemeral message is visible only to the person who started the interaction. Set `flags` to `128`.
+
+```json
+{ "type": 1, "data": { "content": "Only you can see this message.", "flags": 128 } }
+```
+
+You can set flag `128` only on callback types `1` and `2`. You cannot set it when you create a message with the messages route.
+
+Fractura deletes ephemeral messages after approximately 1 hour. Fractura does not send a `MessageDelete` event for this deletion. Other people cannot use components on an ephemeral message.
+
+Flag `16` prevents link previews. To set both flags, add the values: `144`.
+
+## Defer the reply
+
+Send type `2` when the work takes more than a few seconds. Fractura shows a loading message and returns its `messageId`. Edit that message when the work is complete.
+
+<CodeGroup>
+
+```javascript
+const { messageId } = await api("POST", `/interactions/${interaction.id}/callback`, {
+  type: 2,
+});
+
+const report = await buildReport(); // Work that takes a long time.
+
+await api("PATCH", `/channels/${interaction.channelId}/messages/${messageId}`, {
+  content: report,
+});
+```
+
+```python
+callback = await api("POST", f"/interactions/{interaction['id']}/callback", {"type": 2})
+
+report = await build_report()  # Work that takes a long time.
+
+await api(
+    "PATCH",
+    f"/channels/{interaction['channelId']}/messages/{callback['messageId']}",
+    {"content": report},
+)
+```
+
+</CodeGroup>
+
+To make the final message ephemeral, set `"flags": 128` on the type `2` callback. You cannot change this flag later.
+
+## Update the source message
+
+For a button or a select, send type `3` to edit the message that contains the component. This example disables a button after a person clicks it.
+
+<CodeGroup>
+
+```javascript
+await api("POST", `/interactions/${interaction.id}/callback`, {
+  type: 3,
+  data: {
+    content: "Order confirmed.",
+    components: [
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 1, label: "Confirmed", customId: "confirm", disabled: true },
+        ],
+      },
+    ],
+  },
+});
+```
+
+```python
+await api("POST", f"/interactions/{interaction['id']}/callback", {
+    "type": 3,
+    "data": {
+        "content": "Order confirmed.",
+        "components": [
+            {
+                "type": 1,
+                "components": [
+                    {"type": 2, "style": 1, "label": "Confirmed", "customId": "confirm", "disabled": True},
+                ],
+            }
+        ],
+    },
+})
+```
+
+</CodeGroup>
+
+To remove all components, send `"components": []`.
+
+## After the callback
+
+After the callback, use the message routes with the bot token:
+
+- To edit the reply, send `PATCH /channels/:channelId/messages/:messageId`. This also works for an ephemeral reply.
+- To send another message, send `POST /channels/:channelId/messages`.
+- To delete the reply, send `DELETE /channels/:channelId/messages/:messageId`.
+
+Read [Messages](/docs/messages).

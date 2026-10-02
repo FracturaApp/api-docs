@@ -1,0 +1,161 @@
+---
+title: Attachments
+description: Upload files and attach them to messages.
+order: 54
+---
+
+A file upload has three steps:
+
+1. Ask Fractura for an upload URL.
+2. Send the file to that URL.
+3. Send a message with the attachment id.
+
+## 1. Create an upload
+
+<Endpoint method="POST" path="/attachments" />
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | string | The file name. 1 to 256 characters. |
+| `size` | integer | The file size in bytes. |
+| `mimeType` | string | The MIME type, for example `image/png`. 1 to 128 characters. |
+| `type` | integer | `1` for a message file. `0` for an icon. `2` for an emoji. |
+| `contextType` | integer | `2` for a message file. `1` for a server icon or emoji. |
+| `contextId?` | string | For a message file: the channel id. For a server icon or emoji: the server id. |
+
+For a message file, the bot needs View Channels and Send Messages in the channel.
+
+The response contains:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The attachment id. |
+| `uploadUrl` | string | The URL for the file. |
+| `expiresAt` | string | The URL stops working after this time, 1 hour after the request. |
+
+<Caution>
+
+For a message file, set `contextType` to `2` and `contextId` to the channel id. If you do not, the upload is successful, but you cannot attach the file to a message.
+
+</Caution>
+
+### Size limits
+
+| Type | Limit |
+| --- | --- |
+| Icon (`0`) | 10 MiB. PNG, JPEG, WebP, or GIF. |
+| Emoji (`2`) | 256 KiB. PNG, GIF, or WebP. |
+| File (`1`) | The limit of the server. Read `uploadLimitBytes` on the [server object](/docs/servers#server-object). The minimum is 25 MiB. |
+
+## 2. Send the file
+
+Send the file in an HTTP `PUT` request to `uploadUrl`. Do not send the `Authorization` header. Send exactly `size` bytes, and set `Content-Type` to the `mimeType`.
+
+## 3. Attach the file
+
+Put the attachment id in `attachmentIds` when you [create a message](/docs/messages#create-a-message). A message can have at most 10 attachments. You can use each attachment in only one message.
+
+If the upload is not ready yet, Fractura waits up to 30 seconds before it returns an error.
+
+## Example
+
+<CodeGroup>
+
+```javascript
+import { readFile } from "node:fs/promises";
+
+async function sendFile(channelId, path, mimeType, content) {
+  const bytes = await readFile(path);
+  const name = path.split("/").pop();
+
+  const upload = await api("POST", "/attachments", {
+    name,
+    size: bytes.length,
+    mimeType,
+    type: 1,
+    contextType: 2,
+    contextId: channelId,
+  });
+
+  const response = await fetch(upload.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": mimeType },
+    body: bytes,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload failed with status ${response.status}`);
+  }
+
+  return api("POST", `/channels/${channelId}/messages`, {
+    content,
+    attachmentIds: [upload.id],
+  });
+}
+
+await sendFile(channelId, "./report.pdf", "application/pdf", "This week's report.");
+```
+
+```python
+from pathlib import Path
+
+import aiohttp
+
+
+async def send_file(channel_id, path, mime_type, content):
+    data = Path(path).read_bytes()
+
+    upload = await api("POST", "/attachments", {
+        "name": Path(path).name,
+        "size": len(data),
+        "mimeType": mime_type,
+        "type": 1,
+        "contextType": 2,
+        "contextId": channel_id,
+    })
+
+    async with aiohttp.ClientSession() as http:
+        async with http.put(upload["uploadUrl"], data=data, headers={"Content-Type": mime_type}) as response:
+            response.raise_for_status()
+
+    return await api("POST", f"/channels/{channel_id}/messages", {
+        "content": content,
+        "attachmentIds": [upload["id"]],
+    })
+
+
+await send_file(channel_id, "./report.pdf", "application/pdf", "This week's report.")
+```
+
+</CodeGroup>
+
+## Attachment object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The attachment id. |
+| `name` | string | The file name. |
+| `mimeType` | string | The MIME type. |
+| `size` | integer | The size in bytes. |
+| `width`, `height` | ?integer | The size of an image or a video, in pixels. |
+| `duration` | ?number | The length of an audio or video file. |
+| `thumbHash` | ?string | A small placeholder for the image. |
+| `thumbnail` | ?object | `url`, `width`, and `height` of a preview image. |
+| `url` | string | The URL of the file. |
+
+## Delete an upload
+
+<Endpoint method="DELETE" path="/attachments/:attachmentId" />
+
+Deletes an upload that is not in a message. Only the bot that uploaded the file can delete it. The response has status `204`.
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `61000` | 404 | The attachment does not exist. |
+| `61001` | 400 | The MIME type is not allowed for this attachment type. |
+| `61002` | 400 | The icon or emoji is too large. |
+| `61013` | 400/408 | The file is not valid, or it was not ready within 30 seconds. |
+| `61014` | 400 | The attachment is in a message, so you cannot delete it. |
+| `61029` | 400 | The file is larger than the limit of the server. |

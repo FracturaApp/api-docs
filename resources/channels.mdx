@@ -1,0 +1,209 @@
+---
+title: Channels
+description: Read, create, change, and delete channels and their permission overrides.
+order: 51
+---
+
+## Channel object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The channel id. |
+| `serverId?` | ?string | The server id. `null` for a direct message. |
+| `name` | string | The channel name. |
+| `type` | integer | The [channel type](#channel-types). |
+| `position` | integer | The sort position in its category. |
+| `parentId` | ?string | The id of the category or the parent channel. |
+| `description` | ?string | The channel topic. |
+| `flags` | string | The [channel flags](#channel-flags), as a decimal string. |
+| `slowmode` | ?integer | The number of seconds that a member must wait between messages. |
+| `bitrate` | ?integer | Voice and stage channels only. |
+| `permissionOverrides` | array | The [permission overrides](#permission-overrides). |
+
+A thread also has `ownerId` and `threadMetadata`. Read [Threads](/docs/threads).
+
+### Channel types
+
+| Value | Name |
+| --- | --- |
+| `0` | Text |
+| `1` | Category |
+| `2` | DM |
+| `3` | GroupDM |
+| `4` | Thread |
+| `5` | PrivateThread |
+| `6` | Voice |
+| `7` | Stage |
+| `8` | GitHub |
+
+### Channel flags
+
+| Value | Name |
+| --- | --- |
+| `1` | AgeRestricted |
+| `2` | SyncWithParent |
+| `4` | Indexed |
+| `8` | PublicMeeting |
+| `16` | PrivateMeeting |
+| `32` | Linked |
+| `64` | GithubThread |
+
+## Get the channels of a server
+
+<Endpoint method="GET" path="/servers/:serverId/channels" />
+
+Returns all channels of the server, sorted by `position`. The bot needs View Channels in the server.
+
+<Note>
+
+The list contains channels that the bot cannot see. To know if the bot can see a channel, calculate its permissions with the [overrides](#permission-overrides).
+
+</Note>
+
+## Get a channel
+
+<Endpoint method="GET" path="/channels/:channelId" />
+
+Returns one channel. The bot needs View Channels in the channel.
+
+## Create a channel
+
+<Endpoint method="POST" path="/servers/:serverId/channels" />
+
+The bot needs Manage Channels. Manage Channels needs the `admin_actions` grant.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | string | 1 to 100 characters. Letters, numbers, emoji, spaces, `-`, and `_`. The name cannot start or end with a space. |
+| `type` | integer | `0` Text, `1` Category, `6` Voice, `7` Stage, or `8` GitHub. |
+| `parentId?` | string | The id of a category in the same server. |
+| `position?` | integer | If you omit it, the channel goes after the last channel. |
+| `description?` | string | At most 1000 characters. |
+
+The response contains the new channel.
+
+<CodeGroup>
+
+```javascript
+const channel = await api("POST", `/servers/${serverId}/channels`, {
+  name: "support-tickets",
+  type: 0,
+  parentId: categoryId,
+  description: "One thread for each ticket.",
+});
+```
+
+```python
+channel = await api("POST", f"/servers/{server_id}/channels", {
+    "name": "support-tickets",
+    "type": 0,
+    "parentId": category_id,
+    "description": "One thread for each ticket.",
+})
+```
+
+</CodeGroup>
+
+## Change a channel
+
+<Endpoint method="PATCH" path="/channels/:channelId" />
+
+The bot needs Manage Channels. For a thread, read [Threads](/docs/threads#change-a-thread).
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name?` | string | 1 to 100 characters. |
+| `description?` | ?string | At most 1000 characters. |
+| `slowmode?` | ?integer | Seconds between messages. `null` removes slowmode. |
+| `bitrate?` | ?integer | 32 to 128. Voice and stage channels only. |
+
+Send at least one field. The response contains the channel.
+
+## Reorder channels
+
+<Endpoint method="PATCH" path="/servers/:serverId/channels/reorder" />
+
+The bot needs Manage Channels.
+
+```json
+{
+  "channels": [
+    { "id": "1270000000000000005", "position": 0, "parentId": "1270000000000000001" },
+    { "id": "1270000000000000006", "position": 1, "parentId": "1270000000000000001" }
+  ]
+}
+```
+
+<Caution>
+
+Always send `parentId`. If you omit it, Fractura moves the channel out of its category.
+
+</Caution>
+
+## Delete a channel
+
+<Endpoint method="DELETE" path="/channels/:channelId" />
+
+The bot needs Manage Channels. The response has status `204`.
+
+A server admin can restore a deleted channel for a limited time.
+
+<Endpoint method="GET" path="/servers/:serverId/channels/deleted" />
+
+<Endpoint method="POST" path="/channels/:channelId/restore" />
+
+These routes need Restore Channels. Restore Channels needs the `admin_actions` grant.
+
+## Permission overrides
+
+A permission override changes the permissions of one role or one member in one channel. Read [Permissions](/docs/permissions#channel-overrides) for the order in which Fractura applies them.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The override id. |
+| `targetType` | integer | `0` role or `1` member. |
+| `targetId` | string | The role id or the user id. |
+| `allow` | array | The permissions to allow, in the [permission format](/docs/permissions#format). |
+| `deny` | array | The permissions to deny. |
+| `slowmode` | ?integer | A slowmode for this target. |
+
+<Endpoint method="GET" path="/channels/:channelId/permissions" />
+
+Returns the overrides of the channel.
+
+<Endpoint method="PUT" path="/channels/:channelId/permissions/:targetId" />
+
+Creates or replaces an override. The bot needs Manage Channels. The target role or the highest role of the target member must be lower than the highest role of the bot.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `targetType` | integer | `0` role or `1` member. |
+| `allow` | array | The permissions to allow. |
+| `deny` | array | The permissions to deny. |
+| `slowmode?` | ?integer | A slowmode for this target, in seconds. |
+
+This example hides a channel from `@everyone`. The id of the `@everyone` role is the server id.
+
+<CodeGroup>
+
+```javascript
+await api("PUT", `/channels/${channelId}/permissions/${serverId}`, {
+  targetType: 0,
+  allow: [],
+  deny: [["1", "2"]],
+});
+```
+
+```python
+await api("PUT", f"/channels/{channel_id}/permissions/{server_id}", {
+    "targetType": 0,
+    "allow": [],
+    "deny": [["1", "2"]],
+})
+```
+
+</CodeGroup>
+
+<Endpoint method="DELETE" path="/channels/:channelId/permissions/:targetId" />
+
+Deletes an override. Send `{ "targetType": 0 }` or `{ "targetType": 1 }` in the body. The response has status `204`.

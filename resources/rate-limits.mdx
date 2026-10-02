@@ -1,0 +1,126 @@
+---
+title: Rate limits
+description: Read the rate-limit headers, wait, and send the request again.
+order: 41
+---
+
+Fractura limits how many requests a bot can send in a time window. Each route belongs to a **bucket**. Routes in the same bucket share one counter.
+
+When the bot is over the limit, the request fails with status `429` and code `10013`:
+
+```json
+{
+  "code": 10013,
+  "message": "You are being rate limited, please try again later",
+  "retryAfter": 1.5,
+  "global": false,
+  "bucket": "channel.activity",
+  "scope": "user"
+}
+```
+
+Wait `retryAfter` seconds. Then send the request again. The value can have decimals.
+
+## Headers
+
+Each response has these headers:
+
+| Header | Description |
+| --- | --- |
+| `X-RateLimit-Bucket` | The name of the bucket. |
+| `X-RateLimit-Limit` | The number of requests in the window. |
+| `X-RateLimit-Remaining` | The number of requests that are left in the window. |
+| `X-RateLimit-Reset` | The time when the window resets, in Unix seconds. |
+| `X-RateLimit-Reset-After` | The number of seconds until the window resets. |
+| `X-RateLimit-Scope` | What the bucket counts, for example each user or each channel. |
+| `Retry-After` | On a `429` response: the number of seconds to wait. |
+| `X-RateLimit-Global` | `true` when the limit applies to all routes. |
+
+## Buckets
+
+| Bucket | Routes | Limit |
+| --- | --- | --- |
+| `interaction.respond` | `POST /interactions/:interactionId/callback` | 120 each minute |
+| `application.commands` | `/applications/:appId/commands` | 30 each 5 minutes |
+| `channel.activity` | Writes in one channel: send, edit, and delete messages, reactions, pins, threads | 60 each minute for each channel |
+| `channel.read` | Reads in one channel: messages, pins, threads, webhooks | 180 each minute for each channel |
+| `channel.signal` | `POST /channels/:channelId/typing` | 120 each minute |
+| `channel.search` | `GET /channels/:channelId/search` | 40 each minute |
+| `channel.admin` | `PATCH` and `DELETE /channels/:channelId`, permission overrides | 30 each 5 minutes |
+| `channel.admin` | Writes to `/servers/:serverId/channels` | 60 each 5 minutes |
+| `server.admin` | `/servers/:serverId/` roles, members, bans, kicks, emojis, invites | 120 reads each minute, 60 writes each 5 minutes |
+| `server.lifecycle` | `GET /servers`, `GET /servers/:serverId` | 60 each minute |
+| `server.lifecycle` | `PATCH /servers/:serverId`, `POST /servers/:serverId/leave` | 15 each 10 minutes |
+| `attachment.upload` | `/attachments` | 60 each 5 minutes |
+| `webhook.manage` | `/webhooks/:webhookId` | 30 each 5 minutes |
+| `webhook.execute` | `POST /webhooks/:webhookId/:token` | 60 each minute for each webhook |
+
+Other routes use a default limit: 180 `GET` requests each minute, or 45 other requests each 5 minutes.
+
+<Note>
+
+The `server.admin` bucket counts reads and writes together. Many reads can use the limit for writes.
+
+</Note>
+
+The `webhook.execute` limit is shared by all senders of one webhook.
+
+## Retry automatically
+
+This helper waits and sends the request again when it receives a `429`.
+
+<CodeGroup>
+
+```javascript
+async function apiWithRetry(method, path, body, attempts = 3) {
+  for (let attempt = 1; ; attempt++) {
+    const response = await fetch(API_URL + path, {
+      method,
+      headers: { Authorization: TOKEN, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    if (response.status === 429 && attempt < attempts) {
+      const { retryAfter } = await response.json();
+      await new Promise((resolve) => setTimeout(resolve, Number(retryAfter) * 1000));
+      continue;
+    }
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(`${response.status} ${data.code}: ${data.message}`);
+    }
+
+    return data;
+  }
+}
+```
+
+```python
+import asyncio
+
+
+async def api_with_retry(method, path, body=None, attempts=3):
+    for attempt in range(1, attempts + 1):
+        try:
+            return await api(method, path, body)
+        except ApiError as error:
+            if error.status != 429 or attempt == attempts:
+                raise
+            await asyncio.sleep(float(error.data["retryAfter"]))
+```
+
+</CodeGroup>
+
+## Good practice
+
+- Read `X-RateLimit-Remaining`. Slow down before it is `0`.
+- Do not send the same request in a loop. Put work in a queue.
+- Cache data that does not change often, for example roles and channels. The gateway sends events when they change.
+
+Fractura temporarily blocks an IP address that sends too many invalid requests.

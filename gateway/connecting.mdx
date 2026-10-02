@@ -1,0 +1,296 @@
+---
+title: Connect to the gateway
+sidebarTitle: Connect
+description: Open a WebSocket, identify the bot, send heartbeats, and resume after a disconnect.
+order: 30
+---
+
+The gateway is a WebSocket connection. Fractura sends events to the bot on this connection. The bot uses the [HTTP API](/docs/http) for all actions, for example to send messages or interaction callbacks.
+
+Connect to this URL:
+
+```text
+wss://fractura.org/gateway
+```
+
+Each frame is a JSON text object.
+
+## Frames
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `event` | string | The event name, for example `"MessageCreate"`. |
+| `data` | any | The event data. |
+| `seq?` | integer | The sequence number. Only events that change state have it. |
+
+A frame from the bot can have at most 64 KiB.
+
+## Connection steps
+
+1. Open the WebSocket.
+2. Send `Identify` within 10 seconds.
+3. Read `Ready`. Store `sessionId` and `heartbeatInterval`.
+4. Send `Heartbeat` each `heartbeatInterval` milliseconds.
+5. Store the `seq` of each event that you receive.
+
+### Identify
+
+Send the bot token. Do not add a prefix.
+
+```json
+{ "event": "Identify", "data": { "token": "BOT_TOKEN" } }
+```
+
+### Ready
+
+Fractura answers with `Ready`. `Ready` does not have `seq`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `sessionId` | string | The id of this session. Use it to resume. |
+| `heartbeatInterval` | integer | The time between heartbeats, in milliseconds. A value from 30000 to 55000. |
+| `user` | object | The bot user. |
+| `servers` | array | All servers where the bot is a member. Each server contains its channels, threads, roles, members, and emojis. |
+| `privateChannels` | array | The direct message channels of the bot. |
+
+A server can have `unavailable: true`. Fractura then sends `ServerCreate` for that server when it is available again.
+
+### Heartbeat
+
+Send this frame each `heartbeatInterval` milliseconds:
+
+```json
+{ "event": "Heartbeat", "data": null }
+```
+
+Fractura answers with `{ "event": "HeartbeatAck", "data": null }`. The `data` field is necessary. If Fractura does not receive a heartbeat for 110 seconds, it closes the connection.
+
+## Resume
+
+If the connection closes, the bot can resume the session. Fractura then sends the events that the bot did not receive.
+
+Connect again and send `Identify` with the stored `sessionId` and the last `seq`:
+
+```json
+{
+  "event": "Identify",
+  "data": { "token": "BOT_TOKEN", "sessionId": "1290000000000000000", "seq": 1337 }
+}
+```
+
+If the resume is successful, Fractura sends `Resumed`. Then it sends the missed events in order. `Resumed` contains a **new** `sessionId` and a `heartbeatInterval`. Store the new `sessionId`.
+
+If Fractura cannot resume the session, it sends `Ready` instead. This starts a new session. The `seq` starts again from 1. Your bot must accept `Ready` at all times.
+
+A session stays available for 60 seconds after the connection closes.
+
+## Close codes
+
+| Code | Name | Cause | Action |
+| --- | --- | --- | --- |
+| `4000` | Reconnect | The gateway restarts, or the bot reads events too slowly. | Connect again and resume. |
+| `4001` | NoResume | The token is no longer valid. | Get a new token. Do not resume. |
+| `4002` | InvalidSession | The session cannot continue. | Connect again without `sessionId` and `seq`. |
+| `4003` | RateLimited | The bot sent more than 120 frames in 60 seconds. | Wait, then connect again. |
+| `4004` | ConnectionLimit | The bot has 10 open connections. | Close the other connections. |
+| `4005` | IdentifyTimeout | The bot did not send `Identify` within 10 seconds. | Connect again and send `Identify` first. |
+
+Before some closes, Fractura sends an `Error` event:
+
+```json
+{ "event": "Error", "data": { "code": "InvalidToken", "message": "Token is invalid or expired" } }
+```
+
+| `code` | Cause |
+| --- | --- |
+| `InvalidPayload` | The frame is not valid JSON, or a field is not valid. `errors` contains the details. |
+| `InvalidToken` | The token is not valid. Fractura closes the connection. Do not connect again with the same token. |
+| `AlreadyIdentified` | The bot sent `Identify` two times. |
+| `NotIdentified` | The bot sent an event before `Identify`. |
+| `ConnectionLimit` | The bot has too many connections. |
+| `IdentifyFailed` | A server error occurred. Connect again. |
+
+## Full example
+
+This client identifies, sends heartbeats, resumes after a disconnect, and stops on a permanent error.
+
+<CodeGroup>
+
+```javascript
+const GATEWAY_URL = "wss://fractura.org/gateway";
+const TOKEN = process.env.BOT_TOKEN;
+
+let sessionId = null;
+let lastSeq = 0;
+let stopped = false;
+
+function connect(onEvent) {
+  const socket = new WebSocket(GATEWAY_URL);
+  let heartbeatTimer;
+
+  const send = (event, data) => socket.send(JSON.stringify({ event, data }));
+
+  socket.addEventListener("open", () => {
+    send("Identify", sessionId ? { token: TOKEN, sessionId, seq: lastSeq } : { token: TOKEN });
+  });
+
+  socket.addEventListener("message", (message) => {
+    const { event, data, seq } = JSON.parse(message.data);
+
+    if (seq !== undefined) {
+      lastSeq = seq;
+    }
+
+    if (event === "Ready" || event === "Resumed") {
+      if (event === "Ready") {
+        lastSeq = 0;
+      }
+
+      sessionId = data.sessionId;
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(() => send("Heartbeat", null), data.heartbeatInterval);
+    }
+
+    if (event === "Error" && data.code === "InvalidToken") {
+      stopped = true;
+    }
+
+    onEvent(event, data);
+  });
+
+  socket.addEventListener("close", ({ code }) => {
+    clearInterval(heartbeatTimer);
+
+    if (code === 4001 || code === 4004) {
+      stopped = true;
+    }
+
+    if (code === 4002) {
+      sessionId = null;
+      lastSeq = 0;
+    }
+
+    if (!stopped) {
+      setTimeout(() => connect(onEvent), code === 4003 ? 60_000 : 2_000);
+    }
+  });
+}
+
+connect((event, data) => {
+  if (event === "Ready") {
+    console.log(`Connected as ${data.user.username} in ${data.servers.length} servers.`);
+  }
+});
+```
+
+```python
+import asyncio
+import json
+import os
+
+import aiohttp
+
+GATEWAY_URL = "wss://fractura.org/gateway"
+TOKEN = os.environ["BOT_TOKEN"]
+STOP_CODES = {4001, 4004}
+
+
+async def heartbeat(socket, interval_ms):
+    while True:
+        await asyncio.sleep(interval_ms / 1000)
+        await socket.send_json({"event": "Heartbeat", "data": None})
+
+
+async def run_gateway(on_event):
+    session_id = None
+    last_seq = 0
+
+    async with aiohttp.ClientSession() as http:
+        while True:
+            heartbeat_task = None
+            async with http.ws_connect(GATEWAY_URL) as socket:
+                identify = {"token": TOKEN}
+                if session_id:
+                    identify.update(sessionId=session_id, seq=last_seq)
+                await socket.send_json({"event": "Identify", "data": identify})
+
+                async for message in socket:
+                    if message.type != aiohttp.WSMsgType.TEXT:
+                        break
+                    payload = json.loads(message.data)
+                    event, data = payload["event"], payload["data"]
+                    last_seq = payload.get("seq", last_seq)
+
+                    if event in ("Ready", "Resumed"):
+                        if event == "Ready":
+                            last_seq = 0
+                        session_id = data["sessionId"]
+                        if heartbeat_task:
+                            heartbeat_task.cancel()
+                        heartbeat_task = asyncio.create_task(heartbeat(socket, data["heartbeatInterval"]))
+
+                    if event == "Error" and data["code"] == "InvalidToken":
+                        raise RuntimeError("The bot token is not valid.")
+
+                    await on_event(event, data)
+
+            if heartbeat_task:
+                heartbeat_task.cancel()
+
+            code = socket.close_code
+            if code in STOP_CODES:
+                raise RuntimeError(f"The gateway closed with code {code}.")
+            if code == 4002:
+                session_id, last_seq = None, 0
+            await asyncio.sleep(60 if code == 4003 else 2)
+
+
+async def on_event(event, data):
+    if event == "Ready":
+        print(f"Connected as {data['user']['username']} in {len(data['servers'])} servers.")
+
+
+asyncio.run(run_gateway(on_event))
+```
+
+</CodeGroup>
+
+## Send events
+
+The bot can send four events: `Identify`, `Heartbeat`, `PresenceUpdate`, and `SubscribeToUser`. Fractura rejects all other events with `InvalidPayload`.
+
+### PresenceUpdate
+
+Sets the status of the bot.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `status` | integer | `0` invisible, `1` online, `2` idle, or `3` do not disturb. |
+| `platform` | string | `"web"`, `"desktop"`, or `"mobile"`. |
+| `customStatus?` | ?string | At most 128 characters. |
+
+```json
+{
+  "event": "PresenceUpdate",
+  "data": { "status": 1, "platform": "web", "customStatus": "Type /help" }
+}
+```
+
+### SubscribeToUser
+
+Sends `UserProfileUpdate` events for up to 100 users. Fractura ignores users that do not share a server or a direct message with the bot. Fractura does not send an answer.
+
+```json
+{ "event": "SubscribeToUser", "data": { "userIds": ["1260000000000000000"] } }
+```
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| Frames from the bot | 120 in 60 seconds for each connection |
+| Connections | 10 for each bot |
+| Time to send `Identify` | 10 seconds |
+| Frame size | 64 KiB |
+
+Read [Gateway events](/docs/events) for the events that the bot receives.

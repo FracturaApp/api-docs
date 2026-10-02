@@ -1,0 +1,83 @@
+---
+title: Autocomplete
+description: Suggest values while a person types a command option.
+order: 26
+---
+
+Autocomplete shows suggestions while a person types an option value. Use it when the list of values is too long for `choices`, or when the values change.
+
+## Enable autocomplete
+
+Set `autocomplete: true` on a String, Integer, or Number option. Do not set `choices` or `variadic` on the same option.
+
+```json
+{
+  "name": "weather",
+  "description": "Show the weather in a city.",
+  "options": [
+    {
+      "type": 3,
+      "name": "city",
+      "description": "The city name.",
+      "required": true,
+      "autocomplete": true
+    }
+  ]
+}
+```
+
+## Respond with choices
+
+While the person types, Fractura sends Autocomplete interactions (type `4`). `commandData.options` contains the current values. The option that the person is typing in has `focused: true`.
+
+Answer with callback type `5` within **3 seconds**. If you are late, the person sees no suggestions.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `choices` | array | At most 25 choices. |
+| `choices[].name` | string | The text that the person sees. 1 to 100 characters. |
+| `choices[].value` | string or number | The value that the bot receives. A string has at most 100 characters. |
+
+<CodeGroup>
+
+```javascript
+const CITIES = ["Amsterdam", "Berlin", "Lisbon", "London", "Madrid", "Paris", "Prague", "Vienna"];
+
+async function handleAutocomplete(interaction) {
+  const focused = interaction.commandData.options.find((option) => option.focused);
+  const query = String(focused?.value ?? "").toLowerCase();
+
+  const choices = CITIES.filter((city) => city.toLowerCase().startsWith(query))
+    .slice(0, 25)
+    .map((city) => ({ name: city, value: city.toLowerCase() }));
+
+  await api("POST", `/interactions/${interaction.id}/callback`, {
+    type: 5,
+    data: { choices },
+  });
+}
+```
+
+```python
+CITIES = ["Amsterdam", "Berlin", "Lisbon", "London", "Madrid", "Paris", "Prague", "Vienna"]
+
+
+async def handle_autocomplete(interaction):
+    focused = next(option for option in interaction["commandData"]["options"] if option.get("focused"))
+    query = str(focused.get("value", "")).lower()
+
+    choices = [
+        {"name": city, "value": city.lower()}
+        for city in CITIES
+        if city.lower().startswith(query)
+    ][:25]
+
+    await api("POST", f"/interactions/{interaction['id']}/callback", {
+        "type": 5,
+        "data": {"choices": choices},
+    })
+```
+
+</CodeGroup>
+
+When the person runs the command, the bot receives a normal ApplicationCommand interaction. The person can also enter a value that is not in your choices. Always validate the value.

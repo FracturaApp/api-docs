@@ -1,0 +1,70 @@
+---
+title: Direct messages
+description: Open a direct message with a user and send messages to it.
+order: 53
+---
+
+A bot can send a direct message to a user who is a member of a server where the bot is installed. That install must grant **Send direct messages** (`dm_users`).
+
+The user must also accept direct messages from members of that server. A user cannot receive direct messages from a user that they blocked.
+
+## Open a direct message
+
+<Endpoint method="POST" path="/users/@me/channels" />
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `recipientId` | string | The user id. |
+
+The response contains only the channel id: `{ "id": "..." }`. If the direct message already exists, Fractura returns its id.
+
+Then send messages with [Create a message](/docs/messages#create-a-message).
+
+<CodeGroup>
+
+```javascript
+async function sendDirectMessage(userId, content) {
+  const channel = await api("POST", "/users/@me/channels", { recipientId: userId });
+  return api("POST", `/channels/${channel.id}/messages`, { content });
+}
+
+await sendDirectMessage(userId, "Your report is ready.");
+```
+
+```python
+async def send_direct_message(user_id, content):
+    channel = await api("POST", "/users/@me/channels", {"recipientId": user_id})
+    return await api("POST", f"/channels/{channel['id']}/messages", {"content": content})
+
+
+await send_direct_message(user_id, "Your report is ready.")
+```
+
+</CodeGroup>
+
+### Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `50004` | 403 | No shared server install grants `dm_users`. |
+| `40006` | 404 | The user does not exist. |
+| `40022` | 400 | The user is a bot or a webhook. |
+| `80001` | 403 | The user blocked the bot, or does not accept direct messages from the shared servers. |
+
+## List direct messages
+
+<Endpoint method="GET" path="/users/@me/channels" />
+
+Returns the open direct messages of the bot. Each channel has `type` `2` and a `recipients` array.
+
+## Close a direct message
+
+<Endpoint method="DELETE" path="/users/@me/channels/:channelId" />
+
+Hides the direct message from the list. The messages stay. The response has status `204`.
+
+## Good practice
+
+- Send a direct message only to a user who interacted with the bot, for example after the user runs a command.
+- Do not send the same message to many users.
+- For a short answer, use an [ephemeral reply](/docs/responding#ephemeral-messages) instead.

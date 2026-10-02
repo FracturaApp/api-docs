@@ -1,0 +1,55 @@
+---
+title: Bot user
+description: Add a bot user to an application, set its profile, and reset its token.
+order: 11
+---
+
+A bot user is a user account that your application controls. The bot user joins servers, sends messages, and receives events.
+
+## Add a bot user
+
+1. Open the application in the [developer portal](https://frta.dev).
+2. Open **Bot**.
+3. Select **Add bot**.
+
+The bot username is the name of the application. If the name has more than 20 characters, shorten it on **General information** first.
+
+The user id of the bot is the same as the application id. The discriminator of a bot is always `0`.
+
+## Profile
+
+| Field | Rule |
+| --- | --- |
+| Avatar | Select **Change avatar**. PNG, JPEG, WebP, or GIF. |
+| **Username** | 1 to 20 characters. |
+| **Bio** | At most 190 characters. Read [Markdown](/docs/markdown#bot-bio) for the format. |
+
+Select **Save Changes** to save the profile.
+
+## Bot token
+
+The bot token lets your code act as the bot. **Add bot** does not make a token. To get a token:
+
+1. Open **Bot**.
+2. Select **Reset token** in the "Bot token" section.
+3. Confirm the reset.
+4. If your account has multi-factor authentication, complete the check.
+5. Copy the token. The portal shows it only one time.
+
+A reset makes a new token and deletes all previous tokens of the bot. Code that uses an old token stops working immediately.
+
+<Caution>
+
+Keep the token secret. A person with the token has full control of the bot.
+
+- Do not put the token in your source code. Use an environment variable or a secret manager.
+- Do not commit the token to Git.
+- If somebody else gets the token, reset it immediately.
+
+</Caution>
+
+The token does not expire. Read [Authentication](/docs/authentication) to use it.
+
+## Remove the bot user
+
+There is no button to remove only the bot user. To remove the bot, delete the application. Read [Applications](/docs/applications#delete-an-application).

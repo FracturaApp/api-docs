@@ -1,0 +1,143 @@
+---
+title: Markdown
+description: Format the text of messages, text displays, and bot bios.
+order: 43
+---
+
+The client shows message text as Markdown. The same rules apply to message `content`, to text display components, and to the values of a fields grid.
+
+A message can contain at most 4000 characters.
+
+## Text style
+
+| Syntax | Result |
+| --- | --- |
+| `**bold**` | **bold** |
+| `*italic*` or `_italic_` | *italic* |
+| `__underline__` | Underlined text |
+| `~~strikethrough~~` | Text with a line through it |
+| `\|\|spoiler\|\|` | Hidden text that the reader clicks to show |
+| `` `code` `` | Inline code |
+| `***bold italic***` | Bold and italic text |
+
+`__underline__` is underline, not bold. `_` in a word does not start italic text, so `snake_case_name` stays as it is.
+
+A style can continue over more than one line. A blank line stops it.
+
+To show a Markdown character as text, write a backslash before it: `\*`, `\_`, `\#`, `\>`.
+
+To put a backtick in inline code, use two backticks: ``` `` a`b `` ```.
+
+## Headings and subtext
+
+```text
+# Large heading
+## Medium heading
+### Small heading
+-# Small, gray text
+```
+
+There are three heading levels. `#### Text` stays as text. Put a space after the marks, and start the line with the marks.
+
+## Quotes
+
+```text
+> One quoted line.
+> Another quoted line.
+
+>>> All text from here to the end
+of the message is quoted.
+```
+
+Put a space after `>`. Quotes do not nest.
+
+## Lists
+
+```text
+- An item
+- Another item
+  - A nested item
+
+1. First step
+2. Second step
+```
+
+Use `-` or `*` for a bullet list. Use a number and a period for a numbered list. The list starts at the first number that you write. Indent nested items. A list can have 10 levels.
+
+## Code blocks
+
+````text
+```python
+print("Hello")
+```
+````
+
+Write the language after the first three backticks. The client highlights these languages: `bash`, `c`, `cpp`, `csharp`, `css`, `diff`, `dockerfile`, `go`, `graphql`, `ini`, `java`, `javascript`, `json`, `markdown`, `python`, `rust`, `shell`, `sql`, `typescript`, `xml`, and `yaml`. It also accepts the usual short names, for example `js` and `py`.
+
+Markdown in a code block shows as text.
+
+## Links
+
+```text
+[Fractura](https://fractura.org)
+https://fractura.org
+<https://fractura.org>
+```
+
+A link with text must use `http` or `https`. The text cannot be empty, cannot be a URL, and cannot contain a mention.
+
+A URL in the text gets a [link preview](/docs/link-previews). To hide the preview of one URL, put it in angle brackets. To hide all previews of a message, set message flag `16`.
+
+## Mentions
+
+| Syntax | Result |
+| --- | --- |
+| `<@USER_ID>` | Mentions a user. |
+| `<@&ROLE_ID>` | Mentions a role. |
+| `<#CHANNEL_ID>` | Links to a channel. |
+| `@everyone` | Notifies all members who can see the channel. |
+| `@here` | Notifies the online members who can see the channel. |
+| `</name:COMMAND_ID>` | Shows a command that the reader can click. |
+| `</name subcommand:COMMAND_ID>` | Shows a subcommand. A group and a subcommand are also possible: `</name group subcommand:COMMAND_ID>`. |
+
+`@everyone` and `@here` notify members only if the bot has the Mention Everyone permission. Without it, the text stays but nobody gets a notification. To control notifications, use `allowedMentions`. Read [Messages](/docs/messages#allowed-mentions).
+
+## Emoji
+
+Write a Unicode emoji as the character, for example `👋`. Fractura does not convert `:shortcodes:`.
+
+Write a custom emoji as `<:name:EMOJI_ID>`. Write an animated custom emoji as `<a:name:EMOJI_ID>`.
+
+A message that contains only 1 to 10 emoji shows them larger.
+
+## Timestamps
+
+```text
+<t:1790000000>
+<t:1790000000:R>
+```
+
+The number is a Unix time in seconds. The letter sets the style. The default style is `f`. The client shows the time in the time zone and language of the reader.
+
+| Style | Shows |
+| --- | --- |
+| `t` | Short time |
+| `T` | Time with seconds |
+| `d` | Short date |
+| `D` | Long date |
+| `f` | Date and time |
+| `F` | Day of the week, date, and time |
+| `s` | Short date and short time |
+| `S` | Short date and time with seconds |
+| `R` | Relative time, for example "in 5 minutes" |
+
+## Tables
+
+The client does not show Markdown tables. Use a [fields grid](/docs/components#layout) for data in columns.
+
+## Bot bio
+
+The bio of a bot uses fewer rules:
+
+- **Allowed:** text styles, inline code, subtext, quotes, links, emoji, and timestamps.
+- **Not allowed:** headings, lists, code blocks, and mentions.

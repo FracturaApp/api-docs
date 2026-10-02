@@ -1,0 +1,215 @@
+---
+title: Message components
+sidebarTitle: Components
+description: Add buttons, selects, forms, and layout to bot messages.
+order: 23
+---
+
+A component is a JSON object that adds layout or controls to a message. Put components in the `components` array of a message or a callback. Only bots can send components.
+
+To receive clicks and selections, the application must have the **Message actions** capability. Read [Capabilities](/docs/capabilities).
+
+<Note>
+
+Use the [component builder](/component-builder) to design a message and copy its JSON.
+
+</Note>
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| Components in one message | 40. Fractura counts each nested component. |
+| Nesting depth | 5 |
+| JSON size of the `components` array | 30720 bytes |
+| `customId` | 1 to 100 characters. Each `customId` in a message must be unique. |
+| Controls in one action row | 10 |
+| `label` | 1 to 80 characters |
+
+## Buttons
+
+Put buttons in an action row (type `1`). A button (type `2`) has one of two styles:
+
+| Style | Name | Required fields | Result of a click |
+| --- | --- | --- | --- |
+| `1` | Standard | `label`, `customId` | Fractura sends a MessageComponent interaction. |
+| `2` | Link | `label`, `url` | The client opens the URL. Fractura does not send an interaction. |
+
+A Standard button can also have `color`, a background color as an RGB integer. Each button can have `emoji`, `disabled`, and `tooltip` (at most 150 characters).
+
+```json
+{
+  "content": "Delete this file?",
+  "components": [
+    {
+      "type": 1,
+      "components": [
+        { "type": 2, "style": 1, "label": "Delete", "customId": "delete:4821", "color": 15548997 },
+        { "type": 2, "style": 1, "label": "Cancel", "customId": "cancel:4821" },
+        { "type": 2, "style": 2, "label": "Help", "url": "https://frta.dev/docs/components" }
+      ]
+    }
+  ]
+}
+```
+
+## Selects
+
+A select lets a person choose one or more values. Put each select in its own action row.
+
+| Type | Name | Values |
+| --- | --- | --- |
+| `3` | StringSelect | The `value` of each selected option. |
+| `5` | UserSelect | User ids. |
+| `6` | RoleSelect | Role ids. |
+| `8` | ChannelSelect | Channel ids. |
+
+A StringSelect needs `options`: 1 to 25 objects with `label` and `value`. Fractura fills the choices for the other select types.
+
+`minValues` and `maxValues` set how many values the person can select. The default for both is `1`. The maximum is `25`.
+
+```json
+{
+  "type": 1,
+  "components": [
+    {
+      "type": 3,
+      "customId": "region",
+      "placeholder": "Select a region",
+      "options": [
+        { "label": "Europe", "value": "eu" },
+        { "label": "North America", "value": "na", "description": "US and Canada" },
+        { "label": "Asia", "value": "asia" }
+      ]
+    }
+  ]
+}
+```
+
+The selected values are in `componentData.values`.
+
+## Handle a click
+
+A click or a selection sends a MessageComponent interaction (type `3`). Read `componentData.customId` to find the component. Then send a callback:
+
+- Type `3` edits the message that contains the component.
+- Type `1` sends a new message.
+- Type `4` accepts the click without a change.
+- Type `6` opens a modal.
+
+<CodeGroup>
+
+```javascript
+async function handleComponent(interaction) {
+  const [action, fileId] = interaction.componentData.customId.split(":");
+
+  if (action === "delete") {
+    await deleteFile(fileId);
+
+    await api("POST", `/interactions/${interaction.id}/callback`, {
+      type: 3,
+      data: { content: "File deleted.", components: [] },
+    });
+  }
+}
+```
+
+```python
+async def handle_component(interaction):
+    action, _, file_id = interaction["componentData"]["customId"].partition(":")
+
+    if action == "delete":
+        await delete_file(file_id)
+
+        await api("POST", f"/interactions/{interaction['id']}/callback", {
+            "type": 3,
+            "data": {"content": "File deleted.", "components": []},
+        })
+```
+
+</CodeGroup>
+
+## Layout
+
+These components arrange content in a message. They do not send interactions.
+
+| Type | Name | Use |
+| --- | --- | --- |
+| `10` | TextDisplay | Markdown text. `content` has at most 4000 characters. |
+| `9` | Section | 1 to 3 text displays with an optional button, file, or overflow menu at the side. |
+| `14` | Separator | A space between components. Set `divider` to show a line. |
+| `17` | Container | A box that groups components. `accentColor` sets the color of its edge. |
+| `28` | FieldsGrid | Name and value pairs in 1 or 2 columns. |
+| `30` | Collapsible | Content that the person can open and close. |
+| `12` | MediaGallery | 1 to 10 images or videos from URLs. |
+| `13` | File | A file that the bot uploaded. |
+| `29` | Progress | A progress bar from 0 to 100. |
+| `40` | Author | A name with an optional link and image. |
+
+Message text does not show Markdown tables. Use a fields grid for data in columns.
+
+This example shows a status card:
+
+```json
+{
+  "components": [
+    {
+      "type": 17,
+      "accentColor": 6143310,
+      "components": [
+        { "type": 10, "content": "## Deploy finished\nVersion `2.4.1` is live." },
+        { "type": 14, "divider": true },
+        {
+          "type": 28,
+          "columns": 2,
+          "fields": [
+            { "name": "Duration", "value": "3 min 12 s" },
+            { "name": "Region", "value": "eu-west" }
+          ]
+        },
+        { "type": 29, "value": 100, "label": "Rollout" }
+      ]
+    }
+  ]
+}
+```
+
+## Forms
+
+A form (type `25`) puts inputs in the message. A person fills in the inputs and clicks the submit button. Fractura then sends one FormSubmit interaction (type `7`) with all values in `formData.fields`.
+
+A form must contain:
+
+- At least one label (type `18`) with an input.
+- Exactly one button with `"submit": true`, in an action row.
+
+```json
+{
+  "type": 25,
+  "customId": "feedback",
+  "components": [
+    {
+      "type": 18,
+      "label": "Your feedback",
+      "component": { "type": 4, "customId": "text", "style": 2, "maxLength": 1000 }
+    },
+    {
+      "type": 18,
+      "label": "Rating",
+      "component": { "type": 34, "customId": "rating", "scale": 5 }
+    },
+    {
+      "type": 1,
+      "components": [
+        { "type": 2, "style": 1, "label": "Send", "customId": "feedback_send", "submit": true }
+      ]
+    }
+  ]
+}
+```
+
+A form cannot contain a radio group or a file upload. Use a [modal](/docs/modals) for these inputs.
+
+A button in a form without `submit` sends a normal MessageComponent interaction.
+
+Read [Component reference](/docs/component-reference) for all fields of each component.

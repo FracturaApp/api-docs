@@ -1,0 +1,181 @@
+---
+title: Link previews
+description: What link previews are, how to block them, and how to get a good preview for your website.
+order: 44
+---
+
+A link preview is a card that Fractura shows under a message that contains a URL. The card can show the site name, a title, a description, an image, a video, or a player.
+
+Fractura makes previews for up to 10 URLs in each message. The previews show a short time after the message is sent or edited. When they are ready, bots receive a `MessageUpdate` event with `linkPreviews`.
+
+Fractura does not make a preview for:
+
+- A URL in angle brackets: `<https://example.com>`.
+- A URL in inline code or in a code block.
+- A Fractura invite link. The client shows an invite card instead.
+- An ephemeral message.
+- A message with the SuppressLinkPreviews flag (`16`).
+
+## Block previews
+
+### In your message
+
+To hide all previews of your message, open the menu of the message and select **Suppress Link Previews**. To show them again, select **Show Link Previews**. Only the author of a message can do this.
+
+To hide the preview of one URL, put the URL in angle brackets:
+
+```text
+Read the guide: <https://example.com/guide>
+```
+
+### In a bot message
+
+Set message flag `16` (SuppressLinkPreviews). You can set it when you [create a message](/docs/messages#create-a-message), [edit a message](/docs/messages#edit-a-message), send an [interaction callback](/docs/responding), or post with a [webhook](/docs/webhooks#post-a-message).
+
+<CodeGroup>
+
+```javascript
+await api("POST", `/channels/${channelId}/messages`, {
+  content: "Read the changelog: https://example.com/changelog",
+  flags: 16,
+});
+```
+
+```python
+await api("POST", f"/channels/{channel_id}/messages", {
+    "content": "Read the changelog: https://example.com/changelog",
+    "flags": 16,
+})
+```
+
+</CodeGroup>
+
+To show the previews again, edit the message and send `flags` without `16`.
+
+You can also put a URL in angle brackets in the message text.
+
+### On your website
+
+Fractura requests pages with this user agent:
+
+```text
+FracturaLinkPreview/1.0 (https://fractura.org/developer/docs/link-previews)
+```
+
+To block previews of your pages, return an error status, for example `403`, to this user agent. Fractura does not read `robots.txt`.
+
+```text
+# nginx
+if ($http_user_agent ~* "FracturaLinkPreview") {
+    return 403;
+}
+```
+
+## Make a good preview
+
+Add these tags to the `<head>` of your page:
+
+```html
+<head>
+  <title>Release notes 2.4</title>
+  <meta property="og:site_name" content="Example">
+  <meta property="og:title" content="Release notes 2.4">
+  <meta property="og:description" content="Faster search and a new dark theme.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="https://example.com/cards/release-2-4.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The new search page in dark mode">
+  <meta name="theme-color" content="#5dbd4e">
+  <link rel="icon" href="/favicon.png">
+</head>
+```
+
+| Field | Tags | Limit |
+| --- | --- | --- |
+| Title | `og:title`, `twitter:title`, or `<title>` | 256 characters |
+| Description | `og:description`, `twitter:description`, or `description` | 600 characters |
+| Site name | `og:site_name` or `application-name` | 120 characters |
+| Color | `theme-color` | |
+| Image | `og:image` or `twitter:image` | |
+| Image text | `og:image:alt` or `twitter:image:alt` | 180 characters |
+| Video | `og:video` or `twitter:player` | |
+| Audio | `og:audio` | |
+| Icon | `<link rel="icon">` | |
+
+Your page must:
+
+- Return a status from 200 to 299 and an HTML content type.
+- Be smaller than 2 MiB.
+- Respond within 10 seconds.
+
+A preview shows one image, video, or audio file. A URL that points directly to an image, a video, or an audio file shows that file.
+
+Fractura keeps a preview for up to 12 hours. After you change your page, previews in chat can show the old data for that time.
+
+## Test a preview
+
+The [link previewer](/link-previewer) in the developer portal shows the preview for a URL. It always gets the current version of the page.
+
+1. Sign in to the [developer portal](https://frta.dev).
+2. Open **Link previewer**.
+3. Enter a URL.
+4. Select **Preview**.
+
+The result shows the preview card and its JSON.
+
+## Rich previews
+
+Fractura shows a rich preview for some sites:
+
+| Site | Preview |
+| --- | --- |
+| YouTube | A video player |
+| Spotify | A music player |
+| X | A post card |
+| Bluesky | A post card |
+
+## Link preview object
+
+The `linkPreviews` field of a [message](/docs/messages#message-object) is an array of these objects.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The preview id. |
+| `url` | string | The URL. |
+| `type` | string | `"website"`, `"article"`, `"video"`, `"audio"`, or `"social"`. |
+| `provider` | string | `"generic"`, `"youtube"`, `"spotify"`, `"twitter"`, or `"bluesky"`. |
+| `providerId` | ?string | The id of the item on the site, for example a video id. |
+| `siteName` | ?string | The site name. |
+| `title` | ?string | The title. |
+| `description` | ?string | The description. |
+| `faviconUrl` | ?string | The URL of the site icon. |
+| `color` | ?string | The accent color. |
+| `author` | ?object | `name`, `url`, and `avatarUrl`. Each is `?string`. |
+| `publishedAt` | ?string | The publication date. |
+| `media` | array | 0 or 1 [media object](#media-object). |
+| `embed` | ?object | A player. Read [Embed object](#embed-object). |
+
+### Media object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `kind` | string | `"image"`, `"video"`, or `"audio"`. |
+| `url` | string | The URL of the file. |
+| `width`, `height` | ?integer | The size in pixels. |
+| `duration` | ?number | The length in seconds. |
+| `thumbnail` | ?object | `url`, `width`, and `height` of a video thumbnail. |
+| `thumbHash` | ?string | A small placeholder for the image. |
+| `mimeType` | ?string | The MIME type. |
+| `alt` | ?string | The image text. |
+
+### Embed object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `kind` | string | `"iframe"`. |
+| `provider` | string | `"youtube"` or `"spotify"`. |
+| `url` | string | The URL of the player. |
+| `width`, `height` | ?integer | The size of the player. |
+| `aspectRatio` | ?string | The aspect ratio of the player. |
+| `title` | ?string | The title of the player. |

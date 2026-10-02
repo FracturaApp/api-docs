@@ -1,0 +1,74 @@
+---
+title: Install a bot
+description: Choose the permissions of the bot, and add the bot to a server with an install link.
+order: 13
+---
+
+A person adds a bot to a server with an install link. The link opens a screen where the person selects a server and confirms the permissions and capabilities.
+
+## Select the permissions
+
+1. Open the application in the [developer portal](https://frta.dev).
+2. Open **Permissions**.
+3. Select the permissions that the bot needs. Use **Search permissions** to find a permission.
+4. Select **Save Changes**.
+5. Select **Copy install link**.
+
+The **Permissions** panel also shows the selected permissions as JSON. Read [Permissions](/docs/permissions) for the meaning of each permission.
+
+## Install link
+
+The install link has this format:
+
+```text
+https://app.fractura.org/oauth2/authorize?response_type=code&client_id=APPLICATION_ID&scope=bot&permissions=PERMISSIONS
+```
+
+| Parameter | Description |
+| --- | --- |
+| `client_id` | The application id. |
+| `scope` | `bot`. |
+| `permissions?` | A URL-encoded [permission array](/docs/permissions#format). If you omit it, Fractura uses the permissions that you saved on **Permissions**. |
+| `capabilities?` | A comma-separated list of capabilities to request. If you omit it, Fractura requests all install capabilities that the application has. |
+
+For example, this link asks for View Channels, Send Messages, and Read Message History:
+
+```text
+https://app.fractura.org/oauth2/authorize?response_type=code&client_id=1280000000000000000&scope=bot&permissions=%5B%5B%221%22%2C%222%22%5D%2C%5B%222%22%2C%2233%22%5D%5D
+```
+
+## The install screen
+
+The person who opens the link sees:
+
+1. **Add to server**: a list of servers. The person must have Manage Server in the selected server.
+2. **This bot wants to**: a switch for each capability.
+3. **With these permissions**: a switch for each permission.
+
+The person can turn off items. The person cannot add items that the link does not request. Then the person selects **Authorize**.
+
+The person can grant only permissions that the person has. To grant **Perform admin actions**, the person needs Administrator.
+
+## What the install does
+
+- Fractura adds the bot user to the server.
+- Fractura makes a managed role with the name of the application and the granted permissions. The role is at position `1`, directly above `@everyone`.
+- The bot can use the granted capabilities in this server.
+
+If the bot is already in the server, a new install adds the new permissions and capabilities. It does not remove a previous grant.
+
+<Note>
+
+A server admin can move the managed role higher. The bot can manage only roles and members below its highest role. Read [Role hierarchy](/docs/permissions#role-hierarchy).
+
+</Note>
+
+## Remove the bot
+
+A server admin removes the bot when they kick or ban it. This also deletes the managed role and the grants.
+
+You cannot install a bot in a server that banned it.
+
+## Private applications
+
+On the **OAuth2** page, the **Public integration** switch controls who can install the bot. When the switch is off, only you can install it.

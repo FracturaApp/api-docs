@@ -1,0 +1,314 @@
+---
+title: Messages
+description: Send, read, edit, delete, pin, and react to messages.
+order: 50
+---
+
+## Message object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The message id. |
+| `channelId` | string | The channel id. |
+| `serverId?` | ?string | The server id. `null` or absent in a direct message. |
+| `type` | integer | The [message type](#message-types). |
+| `content` | string | The Markdown text. |
+| `flags` | integer | The [message flags](#message-flags). |
+| `author` | object | A [user object](/docs/users#user-object). |
+| `createdAt` | string | ISO 8601 time. |
+| `editedAt?` | ?string | ISO 8601 time of the last edit. |
+| `nonce?` | string | The `nonce` that the sender sent. Only in the create response and the `MessageCreate` event. |
+| `reference?` | ?object | The message that this message replies to. |
+| `mentions?` | object | `users` (user objects), `roles` (ids), `everyone`, and `here`. |
+| `attachments?` | array | [Attachment objects](/docs/attachments#attachment-object). |
+| `reactions?` | array | Each item has `emoji`, `count`, and `me`. |
+| `emojis?` | array | The custom emojis in `content`. |
+| `linkPreviews?` | array | [Link previews](/docs/link-previews) for URLs in `content`. |
+| `components?` | array | The [components](/docs/components) of a bot message. |
+| `interactionMetadata?` | ?object | For a reply to a command: `id`, `type`, `name`, and `userId`. |
+| `invites?` | array | The server invites in `content`. |
+
+### Message types
+
+| Value | Name |
+| --- | --- |
+| `0` | Default |
+| `1` | ChannelPinnedMessage |
+| `2` | ServerMemberJoin |
+| `3` | ThreadCreated |
+| `4` | ChannelUnlinked |
+| `5` | GithubEvent |
+| `6` | GithubCommit |
+
+### Message flags
+
+| Value | Name | Set by |
+| --- | --- | --- |
+| `1` | Pinned | Fractura |
+| `2` | Reply | Fractura |
+| `4` | HasThread | Fractura |
+| `8` | External | Fractura |
+| `16` | SuppressLinkPreviews | You |
+| `32` | FromGitHub | Fractura |
+| `64` | Loading | Fractura |
+| `128` | Ephemeral | An [interaction callback](/docs/responding#ephemeral-messages) |
+
+On the message routes, you can set and remove only flag `16`.
+
+## Create a message
+
+<Endpoint method="POST" path="/channels/:channelId/messages" />
+
+The bot needs View Channels and Send Messages in the channel. The install must grant **Post to configured channels** (`configured_channel_posting`). For a direct message, read [Direct messages](/docs/direct-messages).
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `content?` | string | At most 4000 characters. |
+| `components?` | array | Read [Message components](/docs/components). |
+| `attachmentIds?` | array | At most 10 ids. Read [Attachments](/docs/attachments). |
+| `referenceMessageId?` | string | Makes the message a reply. |
+| `referenceChannelId?` | string | The channel of the referenced message. |
+| `allowedMentions?` | object | Read [Allowed mentions](#allowed-mentions). |
+| `flags?` | integer | Only `16`. |
+| `nonce?` | string | Read [Prevent duplicates](#prevent-duplicates). |
+
+Send `content`, `components`, or `attachmentIds`. Fractura removes spaces at the start and the end of `content`.
+
+The response has status `200` and contains the message object.
+
+<CodeGroup>
+
+```javascript
+const message = await api("POST", `/channels/${channelId}/messages`, {
+  content: "The build passed. Read the report: https://ci.example.com/runs/812",
+  flags: 16,
+});
+```
+
+```python
+message = await api("POST", f"/channels/{channel_id}/messages", {
+    "content": "The build passed. Read the report: https://ci.example.com/runs/812",
+    "flags": 16,
+})
+```
+
+```curl
+curl -X POST "https://fractura.org/api/channels/$CHANNEL_ID/messages" \
+  -H "Authorization: $BOT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"The build passed. Read the report: https://ci.example.com/runs/812","flags":16}'
+```
+
+</CodeGroup>
+
+### Reply to a message
+
+Set `referenceMessageId` to the id of the message. The new message gets flag `2` (Reply).
+
+```json
+{ "content": "Done.", "referenceMessageId": "1290000000000000000" }
+```
+
+### Allowed mentions
+
+`allowedMentions` limits who gets a notification. The text of the mention does not change.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `users?` | array | At most 100 user ids that can get a notification. |
+| `roles?` | array | At most 100 role ids that can get a notification. |
+| `everyone?` | boolean | `false` prevents the `@everyone` notification. |
+| `here?` | boolean | `false` prevents the `@here` notification. |
+| `repliedUser?` | boolean | `false` prevents a notification to the author of the referenced message. |
+
+This example shows a user name in the text, but sends no notification:
+
+```json
+{
+  "content": "<@1260000000000000000> closed the ticket.",
+  "allowedMentions": { "users": [] }
+}
+```
+
+### Prevent duplicates
+
+Send a unique `nonce` with each message. If you send the same `nonce` again within approximately 5 minutes, Fractura returns the first message and does not create a new one. Use this when you retry a request after a network error.
+
+### Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `50005` | 404 | The bot cannot see the channel. |
+| `80001` | 403 | The bot does not have Send Messages, or the install does not grant `configured_channel_posting`. |
+| `80002` | 400 | The message has no content, components, or attachments. |
+| `80011` | 429 | The channel has slowmode. `retryAfter` is the number of seconds to wait. |
+| `80015` | 400 | The thread is archived. |
+| `80016` | 400 | The thread is locked. |
+| `80023` | 409 | A message with the same `nonce` is in progress. |
+
+## Get messages
+
+<Endpoint method="GET" path="/channels/:channelId/messages" />
+
+The bot needs View Channels and Read Message History. The install must grant **Read messages in added channels** (`read_messages_in_added_channels`).
+
+| Query | Description |
+| --- | --- |
+| `limit?` | 1 to 100. The default is 50. |
+| `before?` | Get messages before this message id. |
+| `after?` | Get messages after this message id. |
+| `around?` | Get messages before and after this message id. |
+
+Use only one of `before`, `after`, and `around`. The response is an array of messages, from the oldest to the newest.
+
+This example reads all messages in a channel, 100 at a time, from the newest to the oldest:
+
+<CodeGroup>
+
+```javascript
+async function* readHistory(channelId) {
+  let before;
+
+  while (true) {
+    const query = new URLSearchParams({ limit: "100" });
+    if (before) query.set("before", before);
+
+    const page = await api("GET", `/channels/${channelId}/messages?${query}`);
+    if (page.length === 0) return;
+
+    yield* page.reverse();
+    before = page[page.length - 1].id;
+  }
+}
+
+for await (const message of readHistory(channelId)) {
+  console.log(message.author.username, message.content);
+}
+```
+
+```python
+async def read_history(channel_id):
+    before = None
+    while True:
+        query = "?limit=100" + (f"&before={before}" if before else "")
+        page = await api("GET", f"/channels/{channel_id}/messages{query}")
+        if not page:
+            return
+        for message in reversed(page):
+            yield message
+        before = page[0]["id"]
+
+
+async for message in read_history(channel_id):
+    print(message["author"]["username"], message["content"])
+```
+
+</CodeGroup>
+
+<Endpoint method="GET" path="/channels/:channelId/messages/:messageId" />
+
+Returns one message.
+
+## Edit a message
+
+<Endpoint method="PATCH" path="/channels/:channelId/messages/:messageId" />
+
+The bot can edit only its own messages.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `content?` | string | 1 to 4000 characters. |
+| `components?` | array | The new components. At least 1 component. |
+| `flags?` | integer | Set or remove flag `16`. |
+| `allowedMentions?` | object | Read [Allowed mentions](#allowed-mentions). |
+
+Send at least one of `content`, `components`, and `flags`. The response contains the message.
+
+<Note>
+
+This route cannot remove all components. To remove them, send `"components": []` in an interaction callback of type `3`.
+
+</Note>
+
+## Delete a message
+
+<Endpoint method="DELETE" path="/channels/:channelId/messages/:messageId" />
+
+The bot can always delete its own messages. To delete a message from another user, the bot needs Delete Messages. Delete Messages needs the `admin_actions` grant.
+
+The response has status `204`.
+
+## Reactions
+
+<Endpoint method="PUT" path="/channels/:channelId/messages/:messageId/reactions/:emoji/@me" />
+
+Adds a reaction from the bot. The bot needs View Channels and Add Reactions. The response has status `204`.
+
+<Endpoint method="DELETE" path="/channels/:channelId/messages/:messageId/reactions/:emoji/@me" />
+
+Removes the reaction of the bot. The response has status `204`.
+
+<Endpoint method="GET" path="/channels/:channelId/messages/:messageId/reactions/:emoji" />
+
+Returns the users who reacted with the emoji. `limit` can be 1 to 100. The default is 100.
+
+For `:emoji`, use one of these values. Encode the value for a URL.
+
+- A Unicode emoji: `%F0%9F%91%8D` for 👍.
+- A custom emoji: the emoji id, or `<:name:id>`.
+
+A message can have at most 15 different emojis.
+
+<CodeGroup>
+
+```javascript
+const emoji = encodeURIComponent("👍");
+await api("PUT", `/channels/${channelId}/messages/${messageId}/reactions/${emoji}/@me`);
+```
+
+```python
+from urllib.parse import quote
+
+emoji = quote("👍")
+await api("PUT", f"/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me")
+```
+
+</CodeGroup>
+
+## Pins
+
+<Endpoint method="PUT" path="/channels/:channelId/messages/:messageId/pin" />
+
+<Endpoint method="DELETE" path="/channels/:channelId/messages/:messageId/pin" />
+
+Pins or unpins a message. The bot needs Pin Messages. Pin Messages needs the `admin_actions` grant. The response has status `204`.
+
+<Endpoint method="GET" path="/channels/:channelId/pins" />
+
+Returns all pinned messages, from the newest to the oldest.
+
+## Typing indicator
+
+<Endpoint method="POST" path="/channels/:channelId/typing" />
+
+Shows that the bot is typing. The indicator stays for approximately 8 seconds, or until the bot sends a message. The bot needs Send Messages. The response has status `204`.
+
+## Search
+
+<Endpoint method="GET" path="/channels/:channelId/search" />
+
+The bot needs View Channels and Read Message History.
+
+| Query | Description |
+| --- | --- |
+| `q?` | The text to find. |
+| `from?`, `not_from?` | User ids. You can repeat the parameter. |
+| `mentions?`, `not_mentions?` | User ids. You can repeat the parameter. |
+| `pinned?`, `has_attachments?`, `has_mentions?`, `is_reply?` | `true` or `false`. |
+| `before?`, `after?` | Unix time in seconds. |
+| `sort?` | `newest` (the default) or `oldest`. |
+| `offset?` | The number of results to skip. |
+
+The response contains `messages`, `totalHits`, `limit`, and `offset`. Each page has 20 results.
+
+If the search index is not ready, the response has status `202` and `retryAfter`. Wait, then send the request again.

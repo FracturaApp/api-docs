@@ -1,0 +1,136 @@
+---
+title: Members
+description: Read members, change nicknames, and assign roles.
+order: 61
+---
+
+A member is a user in a server.
+
+## Member object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The membership id. This is **not** the user id. |
+| `user` | object | The [user object](/docs/users#user-object). Use `user.id` for the user id. |
+| `nickname` | ?string | The nickname in this server. |
+| `roleIds` | array | The role ids of the member. |
+| `joinedAt` | string | ISO 8601 time. |
+| `timeoutUntil` | ?string | The end of the timeout. |
+| `flags` | string | `1` if the member joined the server again. |
+
+## Get a member
+
+<Endpoint method="GET" path="/servers/:serverId/members/:userId" />
+
+Returns one member. Use the user id in the path.
+
+## List members
+
+<Endpoint method="GET" path="/servers/:serverId/members" />
+
+The bot needs Kick Members, Ban Members, or Timeout Members. These permissions need the `admin_actions` grant.
+
+| Query | Description |
+| --- | --- |
+| `limit?` | 1 to 1000. The default is 100. |
+| `after?` | Returns members after this membership `id`. |
+| `before?` | Returns members before this membership `id`. |
+
+The members are sorted by membership `id`. To read all members, set `after` to the `id` of the last member on each page.
+
+<CodeGroup>
+
+```javascript
+async function* allMembers(serverId) {
+  let after;
+
+  while (true) {
+    const query = new URLSearchParams({ limit: "1000" });
+    if (after) query.set("after", after);
+
+    const page = await api("GET", `/servers/${serverId}/members?${query}`);
+    yield* page;
+
+    if (page.length < 1000) return;
+    after = page[page.length - 1].id;
+  }
+}
+```
+
+```python
+async def all_members(server_id):
+    after = None
+    while True:
+        query = "?limit=1000" + (f"&after={after}" if after else "")
+        page = await api("GET", f"/servers/{server_id}/members{query}")
+        for member in page:
+            yield member
+        if len(page) < 1000:
+            return
+        after = page[-1]["id"]
+```
+
+</CodeGroup>
+
+## Change a member
+
+<Endpoint method="PATCH" path="/servers/:serverId/members/:userId" />
+
+| Field | Type | Permission | Description |
+| --- | --- | --- | --- |
+| `nickname?` | ?string | Change Nickname for the bot itself. Manage Nicknames for other members. | 1 to 32 characters. `null` removes the nickname. |
+| `timeoutUntil?` | ?string | Timeout Members | An ISO 8601 time. `null` ends the timeout. Read [Moderation](/docs/moderation#timeouts). |
+
+Send at least one field. The response contains `serverId`, `userId`, and the fields that changed.
+
+<CodeGroup>
+
+```javascript
+// The bot user id is the same as the application id.
+await api("PATCH", `/servers/${serverId}/members/${APPLICATION_ID}`, { nickname: "Helper" });
+```
+
+```python
+# The bot user id is the same as the application id.
+await api("PATCH", f"/servers/{server_id}/members/{APPLICATION_ID}", {"nickname": "Helper"})
+```
+
+</CodeGroup>
+
+## Roles of a member
+
+These routes need Assign Roles. Assign Roles needs the `admin_actions` grant. Each role must be lower than the highest role of the bot. The body is an array of at most 100 role ids.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| `POST` | `/servers/:serverId/members/:userId/roles` | Adds the roles. |
+| `DELETE` | `/servers/:serverId/members/:userId/roles` | Removes the roles. |
+| `PUT` | `/servers/:serverId/members/:userId/roles` | Replaces all roles. Fractura keeps `@everyone` and managed roles. |
+
+The response contains `roleIds`: all roles of the member after the change.
+
+<CodeGroup>
+
+```javascript
+const { roleIds } = await api("POST", `/servers/${serverId}/members/${userId}/roles`, [
+  verifiedRoleId,
+]);
+```
+
+```python
+result = await api("POST", f"/servers/{server_id}/members/{user_id}/roles", [verified_role_id])
+role_ids = result["roleIds"]
+```
+
+</CodeGroup>
+
+You cannot add or remove `@everyone` or a managed role.
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `50004` | 403 | The bot does not have the permission, or the role is not lower than the highest role of the bot. |
+| `50006` | 400 | A role does not exist in the server. |
+| `50007` | 404 | The user is not a member. |
+| `50011` | 400 | The role is `@everyone` or a managed role. |

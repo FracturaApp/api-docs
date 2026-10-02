@@ -1,0 +1,60 @@
+---
+title: Applications
+description: Create an application in the developer portal and change its settings.
+order: 10
+---
+
+An application is the base of each bot and each OAuth2 integration. The [developer portal](https://frta.dev) calls an application an **integration**.
+
+Sign in to the developer portal with your Fractura account. The **Integrations** page shows all your applications.
+
+## Create an application
+
+1. Open the [developer portal](https://frta.dev).
+2. Select **New integration**.
+3. Enter a **Name**.
+4. Select **Create**.
+
+The portal opens the new application. Each application has these pages:
+
+| Page | Use |
+| --- | --- |
+| **General information** | The name, the description, and the application id. |
+| **Bot** | Add a bot user, and reset its token. Read [Bot user](/docs/bot-user). |
+| **OAuth2** | The client secret, redirect URIs, and authorization URLs. Read [OAuth2](/docs/oauth2). |
+| **Permissions** | The permissions of the bot, and the install link. Read [Install a bot](/docs/install-a-bot). |
+| **Capabilities** | The features that the application can use. Read [Capabilities](/docs/capabilities). |
+
+When you change a setting, a bar shows at the bottom of the page. Select **Save Changes** to save, or **Reset** to discard the changes.
+
+## General information
+
+| Field | Rule |
+| --- | --- |
+| **Name** | 1 to 80 characters. If the application has a bot, 1 to 20 characters. |
+| **Description** | Optional. At most 240 characters. |
+
+The page also shows the **Application ID**. Use the copy button to copy it. The application id is also the client id for OAuth2 and the user id of the bot.
+
+<Note>
+
+If the application has a bot, a change to the name also changes the username of the bot.
+
+</Note>
+
+## Limits
+
+You can own at most 150 applications with a bot user. There is no limit for applications without a bot.
+
+## Delete an application
+
+1. Open **General information**.
+2. Select **Delete** in the "Delete integration" section.
+3. Type the name of the application.
+4. Select **Delete**.
+
+<Caution>
+
+This deletes the application and its bot user. Fractura revokes the bot token and removes the bot from all servers. You cannot undo this action.
+
+</Caution>

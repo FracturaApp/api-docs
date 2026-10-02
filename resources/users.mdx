@@ -1,0 +1,91 @@
+---
+title: Users
+description: Read the bot user, other users, and set the presence of the bot.
+order: 66
+---
+
+## User object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The user id. For a bot, this is the application id. |
+| `username` | string | The username. |
+| `displayName` | ?string | The display name. If it is `null`, show `username`. |
+| `discriminator` | string | `"0"` for bots. |
+| `avatarHash` | ?string | The avatar hash. |
+| `flags` | string | The [user flags](#user-flags), as a decimal string. |
+| `privateFlags` | string | Flags for the account state. |
+
+### User flags
+
+| Value | Name |
+| --- | --- |
+| `1` | Staff |
+| `2` | BugHunterLevel1 |
+| `4` | BugHunterLevel2 |
+| `8` | Bot |
+| `16` | Webhook |
+| `32` | GitHub |
+
+To check if a user is a bot, test bit `8`:
+
+<CodeGroup>
+
+```javascript
+const isBot = (BigInt(user.flags) & 8n) !== 0n;
+```
+
+```python
+is_bot = int(user["flags"]) & 8 != 0
+```
+
+</CodeGroup>
+
+## Get the bot user
+
+<Endpoint method="GET" path="/users/@me" />
+
+Returns the bot user.
+
+## Get a user
+
+<Endpoint method="GET" path="/users/:userId" />
+
+Returns a user.
+
+<Endpoint method="GET" path="/users/:userId/profile" />
+
+Returns `bio` and `connections`. Each connection has `type`, `externalId`, and `externalUsername`.
+
+## Set the presence
+
+<Endpoint method="PATCH" path="/users/@me/presence" />
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `status?` | integer | `0` invisible, `1` online, `2` idle, or `3` do not disturb. |
+| `customStatus?` | ?string | At most 128 characters. |
+
+You can also set the presence on the gateway with [`PresenceUpdate`](/docs/connecting#presenceupdate).
+
+<CodeGroup>
+
+```javascript
+await api("PATCH", "/users/@me/presence", { status: 1, customStatus: "Type /help" });
+```
+
+```python
+await api("PATCH", "/users/@me/presence", {"status": 1, "customStatus": "Type /help"})
+```
+
+</CodeGroup>
+
+## Change the bot profile
+
+A bot cannot change its username, avatar, or bio with the API. Change them in the [developer portal](/docs/bot-user).
+
+<Caution>
+
+Do not call `DELETE /auth/logout` with the bot token. This route deletes the token. You must then reset the token in the developer portal.
+
+</Caution>

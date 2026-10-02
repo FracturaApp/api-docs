@@ -1,7 +1,228 @@
 ---
 title: Quickstart
-description: Create your first integration in a couple of minutes.
+description: Make a bot that answers the /ping command.
 order: 2
 ---
 
-This is a placeholder for the quickstart guide.
+On this page, you make a bot that answers `/ping` with `Pong.`
+
+You need:
+
+- A Fractura account.
+- A server where you have the Manage Server permission.
+- Node.js 22 or later, Bun, or Python 3.10 or later.
+
+## 1. Create the bot
+
+1. Open the [developer portal](https://frta.dev).
+2. Select **New integration**. Enter a name with at most 20 characters. Select **Create**.
+3. Open **Bot**. Select **Add bot**.
+4. In the "Bot token" section, select **Reset token**. Copy the token.
+5. Open **Capabilities**. Turn on **Slash commands** and **Configured channel posting**. Select **Save Changes**.
+6. Open **General information**. Copy the **Application ID**.
+
+<Caution>
+
+The portal shows the token only one time. Keep it secret. Do not put it in your code.
+
+</Caution>
+
+## 2. Install the bot
+
+1. Open **Permissions**. Select **View Channels** and **Send Messages**. Select **Save Changes**.
+2. Select **Copy install link**.
+3. Open the link in your browser.
+4. Select your server in **Add to server**.
+5. Keep all switches on. Select **Authorize**.
+
+The bot is now a member of your server. It is offline until your code connects.
+
+## 3. Set the environment variables
+
+Put the token and the application id in environment variables:
+
+```bash
+export BOT_TOKEN="paste the token here"
+export APPLICATION_ID="paste the application id here"
+```
+
+## 4. Write the bot
+
+The bot does three things:
+
+1. It registers the `/ping` command with the HTTP API.
+2. It connects to the gateway and sends heartbeats.
+3. It answers each `/ping` interaction with a callback.
+
+<CodeGroup>
+
+```javascript
+// bot.mjs
+const API_URL = "https://fractura.org/api";
+const GATEWAY_URL = "wss://fractura.org/gateway";
+const TOKEN = process.env.BOT_TOKEN;
+const APPLICATION_ID = process.env.APPLICATION_ID;
+
+async function api(method, path, body) {
+  const response = await fetch(API_URL + path, {
+    method,
+    headers: { Authorization: TOKEN, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(`${response.status} ${data.code}: ${data.message}`);
+  }
+
+  return data;
+}
+
+async function handleInteraction(interaction) {
+  if (interaction.type !== 2 || interaction.commandData.name !== "ping") {
+    return;
+  }
+
+  await api("POST", `/interactions/${interaction.id}/callback`, {
+    type: 1,
+    data: { content: "Pong." },
+  });
+}
+
+await api("PUT", `/applications/${APPLICATION_ID}/commands`, [
+  { name: "ping", description: "Check that the bot is online." },
+]);
+
+const socket = new WebSocket(GATEWAY_URL);
+let heartbeatTimer;
+
+socket.addEventListener("open", () => {
+  socket.send(JSON.stringify({ event: "Identify", data: { token: TOKEN } }));
+});
+
+socket.addEventListener("message", (message) => {
+  const { event, data } = JSON.parse(message.data);
+
+  if (event === "Ready") {
+    console.log(`Online as ${data.user.username}.`);
+
+    heartbeatTimer = setInterval(() => {
+      socket.send(JSON.stringify({ event: "Heartbeat", data: null }));
+    }, data.heartbeatInterval);
+  }
+
+  if (event === "InteractionCreate") {
+    handleInteraction(data.interaction).catch(console.error);
+  }
+});
+
+socket.addEventListener("close", ({ code }) => {
+  clearInterval(heartbeatTimer);
+  console.log(`The gateway closed the connection with code ${code}.`);
+});
+```
+
+```python
+# bot.py
+import asyncio
+import json
+import os
+
+import aiohttp
+
+API_URL = "https://fractura.org/api"
+GATEWAY_URL = "wss://fractura.org/gateway"
+TOKEN = os.environ["BOT_TOKEN"]
+APPLICATION_ID = os.environ["APPLICATION_ID"]
+
+
+async def api(session, method, path, body=None):
+    async with session.request(method, API_URL + path, json=body) as response:
+        if response.status == 204:
+            return None
+        data = await response.json()
+        if response.status >= 400:
+            raise RuntimeError(f"{response.status} {data['code']}: {data['message']}")
+        return data
+
+
+async def heartbeat(socket, interval_ms):
+    while True:
+        await asyncio.sleep(interval_ms / 1000)
+        await socket.send_json({"event": "Heartbeat", "data": None})
+
+
+async def handle_interaction(session, interaction):
+    if interaction["type"] != 2 or interaction["commandData"]["name"] != "ping":
+        return
+
+    await api(session, "POST", f"/interactions/{interaction['id']}/callback", {
+        "type": 1,
+        "data": {"content": "Pong."},
+    })
+
+
+async def main():
+    async with aiohttp.ClientSession(headers={"Authorization": TOKEN}) as session:
+        await api(session, "PUT", f"/applications/{APPLICATION_ID}/commands", [
+            {"name": "ping", "description": "Check that the bot is online."},
+        ])
+
+        async with session.ws_connect(GATEWAY_URL) as socket:
+            await socket.send_json({"event": "Identify", "data": {"token": TOKEN}})
+            heartbeat_task = None
+
+            async for message in socket:
+                payload = json.loads(message.data)
+                event, data = payload["event"], payload["data"]
+
+                if event == "Ready":
+                    print(f"Online as {data['user']['username']}.")
+                    heartbeat_task = asyncio.create_task(heartbeat(socket, data["heartbeatInterval"]))
+
+                if event == "InteractionCreate":
+                    asyncio.create_task(handle_interaction(session, data["interaction"]))
+
+            if heartbeat_task:
+                heartbeat_task.cancel()
+            print(f"The gateway closed the connection with code {socket.close_code}.")
+
+
+asyncio.run(main())
+```
+
+</CodeGroup>
+
+## 5. Run the bot
+
+For JavaScript, save the code as `bot.mjs`. Run `node bot.mjs` or `bun bot.mjs`.
+
+For Python, save the code as `bot.py`. Install the client library with `pip install aiohttp`. Then run `python bot.py`.
+
+The terminal shows `Online as` and the name of your bot.
+
+## 6. Test the command
+
+1. Open your server in Fractura.
+2. In a text channel, type `/ping`.
+3. Select the command, and send it.
+
+The bot answers `Pong.`
+
+<Note>
+
+If the command does not show, reload the Fractura app. If the bot does not answer, make sure that the code is running. Fractura does not keep interactions while the bot is offline.
+
+</Note>
+
+## Next steps
+
+- This bot does not reconnect after a disconnect. Read [Connect to the gateway](/docs/connecting) for a full client with resume.
+- Add options to your command. Read [Slash commands](/docs/slash-commands).
+- Add buttons to the reply. Read [Message components](/docs/components).
+- Choose the capabilities for a real bot. Read [Capabilities](/docs/capabilities).
