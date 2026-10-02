@@ -1,0 +1,168 @@
+---
+title: Slash commands
+description: Register the commands that people can run with your bot.
+order: 20
+---
+
+A slash command is an action that a person starts from the message box. The person types `/`, selects your command, and fills in the options. Fractura then sends an [interaction](/docs/receiving) to your bot.
+
+The application must have the **Slash commands** capability. The server install must also grant it. Read [Capabilities](/docs/capabilities).
+
+## Routes
+
+The bot token and the token of the application owner can call these routes.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| `GET` | `/applications/:appId/commands` | Returns all commands, sorted by name. |
+| `PUT` | `/applications/:appId/commands` | Replaces all commands. Returns the new list. |
+| `POST` | `/applications/:appId/commands` | Creates or replaces one command with the same name. Returns status `201`. |
+| `DELETE` | `/applications/:appId/commands/:commandId` | Deletes one command. Returns status `204`. |
+
+Use `PUT` when you deploy the bot. Send the full list of commands. Fractura deletes each command that is not in the list.
+
+<Note>
+
+Each `PUT` gives every command a new `id`. Do not store command ids between deploys. Read them again with `GET` when you need them.
+
+</Note>
+
+All commands are global. A command is available in every server that installed the application. You cannot register a command for one server only.
+
+The routes share one rate limit: 30 requests in 5 minutes for each application.
+
+## Command object
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `name` | string | 1 to 32 characters. Use only `a-z`, `0-9`, `_`, and `-`. |
+| `description` | string | 1 to 100 characters. |
+| `options?` | array | At most 25 [options](#options). |
+| `contexts?` | array | The only value is `"server"`. This is also the default. |
+
+The response also contains these fields:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The command id. |
+| `applicationId` | string | Your application id. |
+| `serverId` | ?string | Always `null`. |
+| `version` | string | Increases each time the command list changes. |
+
+An application can have at most 100 commands.
+
+## Options
+
+An option is a value that the person enters after the command name. Set `type` to one of these values:
+
+| Type | Name | The person enters |
+| --- | --- | --- |
+| `1` | Subcommand | A nested command. |
+| `2` | SubcommandGroup | A group of subcommands. |
+| `3` | String | Text. |
+| `4` | Integer | A whole number. |
+| `5` | Boolean | `true` or `false`. |
+| `6` | User | A user. |
+| `7` | Channel | A channel. |
+| `8` | Role | A role. |
+| `9` | Mentionable | A user or a role. |
+| `10` | Number | A decimal number. |
+| `11` | Attachment | A file. |
+
+Each option has these fields:
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `type` | integer | A value from the table above. |
+| `name` | string | Same rule as the command name. Must be unique at its level. |
+| `description` | string | 1 to 100 characters. |
+| `required?` | boolean | The default is `false`. |
+| `choices?` | array | At most 25 choices. Each choice has `name` (1 to 100 characters) and `value`. |
+| `autocomplete?` | boolean | Read [Autocomplete](/docs/autocomplete). |
+| `variadic?` | boolean | The person can enter 1 to 25 values. |
+| `minValue?`, `maxValue?` | number | For Integer and Number options. |
+| `minLength?`, `maxLength?` | integer | For String options. |
+| `options?` | array | Only for Subcommand and SubcommandGroup options. |
+
+A choice `value` is a string of at most 100 characters, or a number.
+
+### Rules
+
+Fractura rejects the command list if an option breaks one of these rules:
+
+- Put all required options before the optional options.
+- Do not put subcommands and value options at the same level.
+- Put a subcommand group only at the top level. A group contains only subcommands.
+- Do not put a subcommand in a subcommand.
+- Do not set `choices` and `autocomplete` on the same option.
+- Do not set `variadic` and `autocomplete` on the same option.
+- Set `variadic` only on the last option. Boolean, Attachment, and subcommand options cannot be variadic.
+
+## Example
+
+This example registers `/echo`. The command has one required String option.
+
+<CodeGroup>
+
+```javascript
+await api("PUT", `/applications/${APPLICATION_ID}/commands`, [
+  {
+    name: "echo",
+    description: "Repeat a message.",
+    options: [
+      {
+        type: 3,
+        name: "text",
+        description: "The text to repeat.",
+        required: true,
+        maxLength: 200,
+      },
+    ],
+  },
+]);
+```
+
+```python
+await api("PUT", f"/applications/{APPLICATION_ID}/commands", [
+    {
+        "name": "echo",
+        "description": "Repeat a message.",
+        "options": [
+            {
+                "type": 3,
+                "name": "text",
+                "description": "The text to repeat.",
+                "required": True,
+                "maxLength": 200,
+            }
+        ],
+    }
+])
+```
+
+```curl
+curl -X PUT "https://fractura.org/api/applications/$APPLICATION_ID/commands" \
+  -H "Authorization: $BOT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '[{"name":"echo","description":"Repeat a message.","options":[{"type":3,"name":"text","description":"The text to repeat.","required":true,"maxLength":200}]}]'
+```
+
+</CodeGroup>
+
+The examples on this page use the `api` helper from [HTTP API](/docs/http#make-a-request).
+
+When a person runs `/echo text:hello`, the interaction contains this `commandData`:
+
+```json
+{
+  "commandId": "1290000000000000000",
+  "name": "echo",
+  "options": [{ "type": 3, "name": "text", "value": "hello" }]
+}
+```
+
+A variadic option has `values` (an array) instead of `value`. A subcommand option has its own `options` array. User, Channel, Role, and Mentionable options contain the id as a string.
+
+## Mention a command
+
+Write `</name:COMMAND_ID>` in message text to show a command that a person can select. For a subcommand, write `</name subcommand:COMMAND_ID>`. Read [Markdown](/docs/markdown#mentions).

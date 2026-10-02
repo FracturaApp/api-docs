@@ -1,0 +1,60 @@
+---
+title: Emojis
+description: List, add, rename, and delete the custom emojis of a server.
+order: 64
+---
+
+A server can have at most 250 custom emojis. To use a custom emoji in text, write `<:name:id>`, or `<a:name:id>` for an animated emoji. Read [Markdown](/docs/markdown#emoji).
+
+## Emoji object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The emoji id. |
+| `name` | string | 2 to 32 characters: letters, numbers, and `_`. |
+| `animated` | boolean | `true` for a GIF emoji. |
+| `creatorId` | string | The user who added the emoji. |
+| `user?` | object | The user who added the emoji. Only in the list response. |
+
+## List emojis
+
+<Endpoint method="GET" path="/servers/:serverId/emojis" />
+
+Returns all custom emojis of the server.
+
+## Add an emoji
+
+<Endpoint method="POST" path="/servers/:serverId/emojis" />
+
+The bot needs Create Emojis. Create Emojis needs the `admin_actions` grant.
+
+First, upload the image as an [attachment](/docs/attachments) with `type` `2`, `contextType` `1`, and the server id as `contextId`. The image must be PNG, GIF, or WebP, and at most 256 KiB.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | string | 2 to 32 characters: letters, numbers, and `_`. |
+| `attachmentId` | string | The id of the uploaded image. |
+
+The response contains the emoji.
+
+## Rename an emoji
+
+<Endpoint method="PATCH" path="/servers/:serverId/emojis/:emojiId" />
+
+The bot needs Create Emojis. Send `{ "name": "new_name" }`.
+
+## Delete an emoji
+
+<Endpoint method="DELETE" path="/servers/:serverId/emojis/:emojiId" />
+
+The bot needs Delete Emojis. The response has status `204`.
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `50033` | 404 | The emoji does not exist. |
+| `50034` | 400 | The server already has an emoji with this name. |
+| `50035` | 400 | The server has 250 emojis. |
+| `61000` | 404 | The attachment does not exist. |
+| `61005` | 403 | Another user uploaded the attachment. |

@@ -1,0 +1,79 @@
+---
+title: Servers
+description: Read and change the servers where the bot is a member.
+order: 60
+---
+
+The bot is a member of each server where a person installed it. The `Ready` event of the [gateway](/docs/connecting#ready) contains the full list of these servers.
+
+## Server object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The server id. This is also the id of the `@everyone` role. |
+| `name` | string | The server name. |
+| `description` | ?string | The server description. |
+| `iconHash` | ?string | The icon hash. |
+| `ownerId` | string | The user id of the owner. |
+| `workspaceId` | ?string | The workspace that owns the server. |
+| `flags` | string | `1` Verified, `2` Partnered, `16` VanityUrl. |
+| `features` | array | Feature names. |
+| `memberChannelId` | ?string | The channel for join messages. |
+| `changeLogChannelId` | ?string | The channel for change logs. |
+| `uploadLimitBytes` | integer | The largest file that members can upload. |
+
+`GET /servers/:serverId` also returns `channels`, `threads`, `roles`, and `emojis`.
+
+## List servers
+
+<Endpoint method="GET" path="/servers" />
+
+Returns the servers of the bot. Each item has only `id`, `name`, `iconHash`, `ownerId`, `workspaceId`, and `flags`.
+
+## Get a server
+
+<Endpoint method="GET" path="/servers/:serverId" />
+
+Returns the server with its channels, threads, roles, and emojis. The bot must be a member.
+
+## Change a server
+
+<Endpoint method="PATCH" path="/servers/:serverId" />
+
+The bot needs Manage Server. Manage Server needs the `admin_actions` grant.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name?` | string | 2 to 100 characters. |
+| `description?` | ?string | At most 1000 characters. |
+| `iconAttachmentId?` | ?string | An icon [attachment](/docs/attachments) with `contextType` `1` and this server as `contextId`. `null` removes the icon. |
+| `memberChannelId?` | ?string | The channel for join messages. |
+| `changeLogChannelId?` | ?string | The channel for change logs. |
+
+Send at least one field. The response contains the server, without channels and roles.
+
+## Leave a server
+
+<Endpoint method="POST" path="/servers/:serverId/leave" />
+
+The bot leaves the server. The response has status `204`.
+
+To remove the bot completely, a server admin must kick or ban it. This also deletes its managed role.
+
+## Vanity URL
+
+<Endpoint method="GET" path="/servers/:serverId/vanity-url" />
+
+<Endpoint method="PUT" path="/servers/:serverId/vanity-url" />
+
+A server with flag `16` can have a vanity invite code. To set it, send `{ "code": "my-server" }`. The code has 2 to 32 characters: lowercase letters, numbers, and `-`. Send `{ "code": null }` to remove it. Setting the code needs Manage Server.
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `10003` | 404 | The server does not exist, or the bot is not a member. |
+| `50001` | 400 | The owner cannot leave the server. |
+| `50025` | 400 | Members cannot leave this workspace server. |
+| `50047` | 403 | The server cannot have a vanity URL. |
+| `50048` | 409 | Another server uses this vanity code. |

@@ -1,0 +1,176 @@
+---
+title: Receive interactions
+description: Read the InteractionCreate event that Fractura sends when a person uses your bot.
+order: 21
+---
+
+An interaction starts when a person uses your bot. For example, the person runs a slash command, clicks a button, or submits a modal.
+
+Fractura sends each interaction to your bot as an `InteractionCreate` event on the [gateway](/docs/connecting). Your bot must keep a gateway connection open to receive them.
+
+You must send a [callback](/docs/responding) within **8 seconds**. For an autocomplete interaction, you have **3 seconds**.
+
+<Caution>
+
+If the bot is offline, the interaction fails and the person sees an error.
+
+</Caution>
+
+## The event
+
+The `data` of the event contains one field, `interaction`:
+
+```json
+{
+  "event": "InteractionCreate",
+  "seq": 42,
+  "data": {
+    "interaction": {
+      "id": "1290000000000000001",
+      "type": 2,
+      "applicationId": "1280000000000000000",
+      "serverId": "1270000000000000000",
+      "channelId": "1270000000000000005",
+      "user": {
+        "id": "1260000000000000000",
+        "username": "ada",
+        "displayName": "Ada",
+        "discriminator": "0",
+        "avatarHash": null,
+        "flags": "0",
+        "privateFlags": "0"
+      },
+      "commandData": {
+        "commandId": "1290000000000000000",
+        "name": "ping",
+        "options": []
+      },
+      "createdAt": "2026-10-02T12:00:00.000Z"
+    }
+  }
+}
+```
+
+## Interaction object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The interaction id. Use it in the callback path. |
+| `type` | integer | The [interaction type](#interaction-types). |
+| `applicationId` | string | Your application id. |
+| `serverId` | string | The server where the person used the bot. |
+| `channelId` | string | The channel where the person used the bot. |
+| `user` | object | The person who started the interaction. |
+| `message?` | object | The message that contains the component. Only for types `3` and `7`. |
+| `commandData?` | object | Only for types `2` and `4`. |
+| `componentData?` | object | Only for types `3` and `8`. |
+| `modalData?` | object | Only for types `5`, `6`, and `8`. |
+| `formData?` | object | Only for type `7`. |
+| `attachments?` | object | Files from Attachment options and File Upload fields. The keys are attachment ids. |
+| `createdAt` | string | The time of the interaction, in ISO 8601 format. |
+
+The interaction does not contain a member object, the permissions of the person, or a token. To get the member, call [`GET /servers/:serverId/members/:userId`](/docs/members).
+
+## Interaction types
+
+| Value | Name | Starts when | Capability |
+| --- | --- | --- | --- |
+| `2` | ApplicationCommand | A person runs a slash command. | `slash_commands` |
+| `3` | MessageComponent | A person clicks a button or selects a value in a message. | `message_actions` |
+| `4` | Autocomplete | A person types in an autocomplete option. | `slash_commands` |
+| `5` | ModalSubmit | A person submits a modal. | None |
+| `6` | ModalCancel | A person closes a modal. | None |
+| `7` | FormSubmit | A person submits a form in a message. | `message_actions` |
+| `8` | ModalComponent | A person clicks a button in a modal. | None |
+
+Interactions occur only in server channels. The person must have the Send Messages permission in the channel.
+
+Do not send a callback for a ModalCancel interaction.
+
+## Data objects
+
+### commandData
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `commandId` | string | The command id. |
+| `name` | string | The command name. |
+| `options` | array | The options that the person entered. |
+
+Each option has these fields:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `type` | integer | The [option type](/docs/slash-commands#options). |
+| `name` | string | The option name. |
+| `value?` | string, number, or boolean | The value. Not for variadic options and subcommands. |
+| `values?` | array | The values of a variadic option. |
+| `options?` | array | The options of a subcommand or a subcommand group. |
+| `focused?` | boolean | `true` on the option that the person is typing in. Autocomplete only. |
+
+User, Channel, Role, Mentionable, and Attachment values are ids. For an Attachment option, read the file from `interaction.attachments[value]`.
+
+### componentData
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `componentType` | integer | The [component type](/docs/component-reference) that the person used. |
+| `customId` | string | The `customId` of the component. |
+| `values?` | array | The selected values. Only for selects and overflow menus. |
+
+### modalData and formData
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | The `customId` of the modal or form. |
+| `fields` | array | One object for each input. |
+
+Each field has `type`, `customId`, and `value` or `values`. Read [Modals](/docs/modals#submitted-values) for the value of each input type. Fractura does not send an input that is hidden by `visibleWhen`.
+
+## Handle the event
+
+This example sends each interaction to a function for its type.
+
+<CodeGroup>
+
+```javascript
+async function handleInteraction(interaction) {
+  switch (interaction.type) {
+    case 2:
+      return handleCommand(interaction);
+    case 3:
+      return handleComponent(interaction);
+    case 4:
+      return handleAutocomplete(interaction);
+    case 5:
+      return handleModalSubmit(interaction);
+    default:
+      return;
+  }
+}
+
+// In the gateway message listener:
+if (payload.event === "InteractionCreate") {
+  handleInteraction(payload.data.interaction).catch(console.error);
+}
+```
+
+```python
+async def handle_interaction(interaction):
+    handlers = {
+        2: handle_command,
+        3: handle_component,
+        4: handle_autocomplete,
+        5: handle_modal_submit,
+    }
+    handler = handlers.get(interaction["type"])
+    if handler:
+        await handler(interaction)
+
+
+# In the gateway loop:
+if payload["event"] == "InteractionCreate":
+    asyncio.create_task(handle_interaction(payload["data"]["interaction"]))
+```
+
+</CodeGroup>

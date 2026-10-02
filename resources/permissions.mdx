@@ -1,0 +1,218 @@
+---
+title: Permissions
+description: Read and write permission values, and understand what a bot can do.
+order: 42
+---
+
+A permission allows an action in a server, for example to send messages or to ban members. Roles give permissions to members. Channel overrides change them for one channel.
+
+Fractura puts permissions in six **categories**. Each category is a separate bit field.
+
+## Format
+
+A permission value is a JSON array of pairs. Each pair is `[category, bits]`. Both values are decimal strings.
+
+```json
+[["1", "2"], ["2", "33"]]
+```
+
+This value gives View Channels (General bit `2`), and Send Messages and Read Message History (Text bits `1` and `32`). To combine bits in one category, add them or use bitwise OR: `1 | 32 = 33`.
+
+Put each category in the array only one time. Omit a category with no bits.
+
+<CodeGroup>
+
+```javascript
+const Category = { General: 1, Text: 2, Voice: 4, Moderation: 8, Roles: 16, Emojis: 32 };
+
+function hasPermission(permissions, category, bit) {
+  const pair = permissions.find(([key]) => Number(key) === category);
+  return pair !== undefined && (BigInt(pair[1]) & BigInt(bit)) !== 0n;
+}
+
+function toPermissions(grants) {
+  return Object.entries(grants).map(([category, bits]) => [
+    String(category),
+    String(bits.reduce((sum, bit) => sum | BigInt(bit), 0n)),
+  ]);
+}
+
+// [["1","2"],["2","33"]]
+const permissions = toPermissions({ [Category.General]: [2], [Category.Text]: [1, 32] });
+
+hasPermission(permissions, Category.Text, 32); // true
+```
+
+```python
+GENERAL, TEXT, VOICE, MODERATION, ROLES, EMOJIS = 1, 2, 4, 8, 16, 32
+
+
+def has_permission(permissions, category, bit):
+    for key, bits in permissions:
+        if int(key) == category:
+            return int(bits) & bit != 0
+    return False
+
+
+def to_permissions(grants):
+    result = []
+    for category, bits in grants.items():
+        value = 0
+        for bit in bits:
+            value |= bit
+        result.append([str(category), str(value)])
+    return result
+
+
+# [["1", "2"], ["2", "33"]]
+permissions = to_permissions({GENERAL: [2], TEXT: [1, 32]})
+
+has_permission(permissions, TEXT, 32)  # True
+```
+
+</CodeGroup>
+
+## Categories
+
+| Category | Value |
+| --- | --- |
+| General | `1` |
+| Text | `2` |
+| Voice | `4` |
+| Moderation | `8` |
+| Roles | `16` |
+| Emojis | `32` |
+
+## General permissions
+
+| Permission | Bit | Needs `admin_actions` |
+| --- | --- | --- |
+| Administrator | `1` | Yes |
+| View Channels | `2` | No |
+| Manage Channels | `4` | Yes |
+| Manage Server | `8` | Yes |
+| Create Invites | `16` | No |
+| Manage Invites | `32` | Yes |
+| Change Nickname | `64` | No |
+| Manage Nicknames | `128` | Yes |
+| View Server Insights | `256` | Yes |
+| Restore Channels | `512` | Yes |
+| Manage Webhooks | `1024` | Needs `webhooks` |
+| Create Meetings | `2048` | Yes |
+| Create Private Meetings | `4096` | Yes |
+| Edit Meetings | `8192` | Yes |
+| Delete Meetings | `16384` | Yes |
+
+## Text permissions
+
+Bit `4` is not used.
+
+| Permission | Bit | Needs `admin_actions` |
+| --- | --- | --- |
+| Send Messages | `1` | Needs `configured_channel_posting` |
+| Delete Messages | `2` | Yes |
+| Embed Links | `8` | No |
+| Attach Files | `16` | No |
+| Read Message History | `32` | Needs `read_messages_in_added_channels` |
+| Mention Everyone | `64` | Yes |
+| Add Reactions | `128` | No |
+| Pin Messages | `256` | Yes |
+| Bypass Slowmode | `512` | Yes |
+| Create Threads | `1024` | No |
+| Manage Threads | `2048` | Yes |
+
+## Voice permissions
+
+| Permission | Bit | Needs `admin_actions` |
+| --- | --- | --- |
+| Connect | `1` | No |
+| Speak | `2` | No |
+| Video | `4` | No |
+| Stream | `8` | No |
+| Use Voice Activity | `16` | No |
+| Priority Speaker | `32` | Yes |
+| Mute Members | `64` | Yes |
+| Deafen Members | `128` | Yes |
+| Move Members | `256` | Yes |
+| Manage Stage | `512` | Yes |
+| Request to Speak | `1024` | No |
+| Become Speaker | `2048` | Yes |
+
+## Moderation permissions
+
+All moderation permissions need `admin_actions`.
+
+| Permission | Bit |
+| --- | --- |
+| Kick Members | `1` |
+| Ban Members | `2` |
+| Timeout Members | `4` |
+| View Audit Log | `8` |
+| Manage Reports | `16` |
+
+## Role permissions
+
+| Permission | Bit | Needs `admin_actions` |
+| --- | --- | --- |
+| View Roles | `1` | No |
+| Create Roles | `2` | Yes |
+| Edit Roles | `4` | Yes |
+| Delete Roles | `8` | Yes |
+| Assign Roles | `16` | Yes |
+
+## Emoji permissions
+
+| Permission | Bit | Needs `admin_actions` |
+| --- | --- | --- |
+| Use Emojis | `1` | No |
+| Use External Emojis | `2` | No |
+| Create Emojis | `4` | Yes |
+| Delete Emojis | `8` | Yes |
+
+## Capabilities limit permissions
+
+A bot can use a permission only if the install grants the related capability. A role with Administrator does not change this.
+
+| Capability that is not granted | Permissions that Fractura removes |
+| --- | --- |
+| `configured_channel_posting` | Send Messages |
+| `read_messages_in_added_channels` | Read Message History |
+| `webhooks` | Manage Webhooks |
+| `admin_actions` | All permissions with "Yes" in the tables above |
+
+For example, a bot without `admin_actions` cannot ban a member, even if its role has Ban Members. Read [Capabilities](/docs/capabilities).
+
+## How Fractura calculates permissions
+
+Fractura calculates the permissions of a member in this order:
+
+1. The server owner has all permissions.
+2. Fractura combines the permissions of the `@everyone` role and of each role of the member. The id of the `@everyone` role is the server id.
+3. If the result contains Administrator, the member has all permissions.
+4. If the member has a timeout, the member has only View Channels and Read Message History.
+5. In a channel, Fractura applies the channel overrides (see below).
+6. For a bot, Fractura removes the permissions that the capabilities do not allow.
+
+### Channel overrides
+
+A channel override changes permissions for one role or one member in one channel. Fractura applies the overrides in this order:
+
+1. The override for `@everyone`: first `deny`, then `allow`.
+2. The overrides for all roles of the member together: first all `deny` values, then all `allow` values.
+3. The override for the member: first `deny`, then `allow`.
+
+Read [Channels](/docs/channels#permission-overrides) to change overrides.
+
+## Role hierarchy
+
+Each role has a `position`. A higher number is a higher role. `@everyone` has position `0`.
+
+A member can change a role or another member only if the target is **lower** than the highest role of the member. The server owner is not limited by this rule.
+
+The install gives the bot a managed role at position `1`. This is the lowest role above `@everyone`. A server admin can move this role higher to let the bot manage more roles and members.
+
+<Note>
+
+A bot cannot edit, assign, or delete its own managed role. Nobody can delete a managed role. To remove it, remove the bot from the server.
+
+</Note>

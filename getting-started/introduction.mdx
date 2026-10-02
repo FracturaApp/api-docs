@@ -1,0 +1,47 @@
+---
+title: Build on Fractura
+sidebarTitle: Overview
+description: Make bots and integrations for Fractura.
+order: 1
+---
+
+These documents tell you how to make bots and integrations for Fractura.
+
+A **bot** is a user account that your code controls. People add the bot to their servers. The bot can answer slash commands, send messages with buttons and forms, open modals, and moderate members.
+
+An **application** holds the bot and its settings. An application can also let people sign in to your service with their Fractura account. Read [OAuth2](/docs/oauth2).
+
+<Note>
+
+The bot API is new. It can change, and some changes can break bots. To get news about changes, join the [Fractura Developers](https://app.fractura.org/invite/fractura-developers) server.
+
+</Note>
+
+## How a bot works
+
+1. You create an application and a bot user in the [developer portal](https://frta.dev).
+2. A server admin installs the bot with an install link.
+3. Your code connects to the **gateway**, a WebSocket. Fractura sends events on it, for example new messages and slash commands.
+4. Your code calls the **HTTP API** to take actions, for example to send a message or to answer a command.
+
+## Addresses
+
+| Service | Address |
+| --- | --- |
+| HTTP API | `https://fractura.org/api` |
+| Gateway | `wss://fractura.org/gateway` |
+| Developer portal | [frta.dev](https://frta.dev) |
+| Component builder | [frta.dev/component-builder](/component-builder) |
+
+## Start here
+
+| Step | Page |
+| --- | --- |
+| Run a bot that answers `/ping`. | [Quickstart](/docs/quickstart) |
+| Send the token on each request. | [Authentication](/docs/authentication) |
+| Choose what your bot can do. | [Capabilities](/docs/capabilities) |
+| Keep the bot online. | [Connect to the gateway](/docs/connecting) |
+| Add commands. | [Slash commands](/docs/slash-commands) |
+| Answer people. | [Respond to interactions](/docs/responding) |
+| Add buttons and layout. | [Message components](/docs/components) |
+| Find a route. | [HTTP API](/docs/http) and the pages under **Resources** |

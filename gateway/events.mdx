@@ -1,0 +1,163 @@
+---
+title: Gateway events
+sidebarTitle: Events
+description: The events that a connected bot receives, and the data in each event.
+order: 31
+---
+
+The bot receives events for each server where it is a member. Permissions and capabilities control which events the bot receives.
+
+- The bot receives an event for a channel only if it has the View Channels permission in that channel.
+- The bot receives message and reaction events in server channels only if the install grants **Read added channels** (`read_messages_in_added_channels`). Without this grant, the bot does not receive events for its own messages either.
+- Events in direct messages do not need a capability.
+
+The bot can ignore each event that it does not use.
+
+## Messages
+
+| Event | Data |
+| --- | --- |
+| `MessageCreate` | A [message object](/docs/messages#message-object). |
+| `MessageUpdate` | The full message after the edit. |
+| `MessageDelete` | `id`, `channelId`, `serverId`. |
+| `MessageReactionAdd` | `channelId`, `messageId`, `serverId`, `userId`, `emoji`. |
+| `MessageReactionRemove` | Same as `MessageReactionAdd`. |
+| `TypingStart` | `serverId`, `channelId`, `userId`. |
+
+`TypingStart` does not need the read grant.
+
+<Caution>
+
+The bot receives `MessageCreate` for its own messages. If the bot replies to messages, ignore messages where `author.id` is the bot id. Otherwise the bot can reply to itself in a loop.
+
+</Caution>
+
+<CodeGroup>
+
+```javascript
+let botUserId;
+
+function onEvent(event, data) {
+  if (event === "Ready") {
+    botUserId = data.user.id;
+  }
+
+  if (event === "MessageCreate" && data.author.id !== botUserId) {
+    if (data.content === "!ping") {
+      api("POST", `/channels/${data.channelId}/messages`, {
+        content: "Pong.",
+        referenceMessageId: data.id,
+      }).catch(console.error);
+    }
+  }
+}
+```
+
+```python
+bot_user_id = None
+
+
+async def on_event(event, data):
+    global bot_user_id
+
+    if event == "Ready":
+        bot_user_id = data["user"]["id"]
+
+    if event == "MessageCreate" and data["author"]["id"] != bot_user_id:
+        if data["content"] == "!ping":
+            await api("POST", f"/channels/{data['channelId']}/messages", {
+                "content": "Pong.",
+                "referenceMessageId": data["id"],
+            })
+```
+
+</CodeGroup>
+
+## Interactions
+
+| Event | Data |
+| --- | --- |
+| `InteractionCreate` | `{ "interaction": { ... } }`. Read [Receive interactions](/docs/receiving). |
+
+Fractura sends `InteractionCreate` only to the bot of the application.
+
+## Servers
+
+| Event | Data |
+| --- | --- |
+| `ServerCreate` | A full server, the same as an item of `Ready.servers`. |
+| `ServerUpdate` | The server fields, without channels and roles. |
+| `ServerDelete` | `id`, `unavailable`. |
+
+`ServerDelete` with `unavailable: true` means that the server is temporarily not available. Fractura sends `ServerCreate` when the server is available again. If a server bans the bot, the bot receives `ServerDelete` with `unavailable: false`.
+
+When the bot leaves a server or a person removes the bot, the bot receives `MemberLeave` with its own user id.
+
+## Channels and threads
+
+| Event | Data |
+| --- | --- |
+| `ChannelCreate` | A [channel object](/docs/channels#channel-object). |
+| `ChannelUpdate` | The full channel after the change. |
+| `ChannelDelete` | `id`, `serverId`, `name`, `type`. |
+| `ChannelsReorder` | `serverId`, `channels`. Each channel has `id`, `position`, and `parentId`. |
+| `ThreadCreate` | `id`, `serverId`, `parentId`, `messageId`, `name`, `type`, `ownerId`, `threadMetadata`. |
+| `ThreadUpdate` | `id`, `serverId`, `parentId`, and the changed fields. |
+| `ThreadDelete` | `id`, `serverId`, `parentId`, `type`. |
+| `ThreadMemberAdd` | `threadId`, `serverId`, `userId`. |
+| `ThreadMemberRemove` | `threadId`, `serverId`, `userId`. |
+
+## Members
+
+| Event | Data |
+| --- | --- |
+| `MemberJoin` | `serverId`, `userId`, `joinedAt`, `member`, `presence`. |
+| `MemberLeave` | `serverId`, `userId`. |
+| `MemberUpdate` | `serverId`, `userId`, and the changed fields: `nickname`, `roleIds`, `timeoutUntil`. |
+| `MemberBan` | `serverId`, `userId`. Only with the Ban Members permission. |
+| `MemberUnban` | `serverId`, `userId`. Only with the Ban Members permission. |
+
+`timeoutUntil` is in `MemberUpdate` only if the bot has the Timeout Members permission.
+
+## Roles
+
+| Event | Data |
+| --- | --- |
+| `RoleCreate` | A [role object](/docs/roles#role-object) and `serverId`. |
+| `RoleUpdate` | The full role after the change. |
+| `RoleDelete` | `roleId`, `serverId`. |
+| `RolesReorder` | `serverId`, `roles`. Each role has `id` and `position`. |
+
+## Emojis
+
+| Event | Data |
+| --- | --- |
+| `EmojiCreate` | An [emoji object](/docs/emojis) and `serverId`. |
+| `EmojiUpdate` | The emoji after the change. |
+| `EmojiDelete` | `id`, `serverId`. |
+
+## Users and presence
+
+| Event | Data |
+| --- | --- |
+| `PresenceUpdate` | `user`, `status`, `platform`, `customStatus`. |
+| `UserUpdate` | A user object after a change. |
+| `UserProfileUpdate` | `id`, `bio`. Only for users from `SubscribeToUser`. |
+
+## Voice
+
+| Event | Data |
+| --- | --- |
+| `VoiceStateUpdate` | `userId`, `channelId`, `serverId`, `selfMute`, `selfDeaf`, `serverMute`, `serverDeaf`, `streaming`, `video`. |
+
+## Webhooks
+
+| Event | Data |
+| --- | --- |
+| `WebhookCreate` | A [webhook object](/docs/webhooks). |
+| `WebhookUpdate` | The webhook after the change. |
+| `WebhookDelete` | `id`, `channelId`, `serverId`. |
+
+## Other events
+
+Fractura also sends events that the Fractura app uses, for example notification and read-state events. Your bot can ignore them.

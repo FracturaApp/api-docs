@@ -1,0 +1,112 @@
+---
+title: Roles
+description: Create, change, order, and delete roles.
+order: 62
+---
+
+A role gives a set of permissions to its members. Read [Permissions](/docs/permissions) for the permission values and the role hierarchy.
+
+## Role object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The role id. The id of `@everyone` is the server id. |
+| `name` | string | The role name. |
+| `color` | integer | An RGB color. `0` means no color. |
+| `permissions` | array | The permissions in the [permission format](/docs/permissions#format). |
+| `position` | integer | A higher number is a higher role. `@everyone` has `0`. |
+| `hoist` | boolean | `true` shows members of the role in a separate group. |
+| `mentionable` | boolean | `true` lets all members mention the role. |
+| `deletable?` | boolean | `false` for `@everyone` and managed roles. Only in create and change responses. |
+
+## List roles
+
+<Endpoint method="GET" path="/servers/:serverId/roles" />
+
+Returns all roles of the server, from the highest to the lowest.
+
+<Endpoint method="GET" path="/servers/:serverId/roles/:roleId" />
+
+Returns one role.
+
+<Endpoint method="GET" path="/servers/:serverId/roles/:roleId/member-count" />
+
+Returns `{ "count": 12 }`. The bot needs View Roles.
+
+## Create a role
+
+<Endpoint method="POST" path="/servers/:serverId/roles" />
+
+The bot needs Create Roles. Create Roles needs the `admin_actions` grant.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | string | 1 to 100 characters. |
+| `color?` | integer | 0 to 16777215. |
+| `hoist?` | boolean | `true` shows members of the role in a separate group. |
+| `mentionable?` | boolean | `true` lets all members mention the role. |
+| `permissions?` | array | The default is no permissions. |
+
+Fractura puts the new role at position `1`, directly above `@everyone`.
+
+<CodeGroup>
+
+```javascript
+const role = await api("POST", `/servers/${serverId}/roles`, {
+  name: "Verified",
+  color: 0x5dbd4e,
+  permissions: [["1", "2"], ["2", "129"]],
+});
+```
+
+```python
+role = await api("POST", f"/servers/{server_id}/roles", {
+    "name": "Verified",
+    "color": 0x5DBD4E,
+    "permissions": [["1", "2"], ["2", "129"]],
+})
+```
+
+</CodeGroup>
+
+This role gives View Channels, Send Messages, and Add Reactions.
+
+## Change a role
+
+<Endpoint method="PATCH" path="/servers/:serverId/roles/:roleId" />
+
+The bot needs Edit Roles. The role must be lower than the highest role of the bot. The body has the same fields as create. Send at least one field.
+
+For `@everyone`, you can change only `permissions` and `mentionable`.
+
+## Reorder roles
+
+<Endpoint method="PATCH" path="/servers/:serverId/roles/reorder" />
+
+The bot needs Edit Roles. The current position and the new position of each role must be lower than the highest role of the bot.
+
+```json
+{
+  "roles": [
+    { "id": "1270000000000000010", "position": 2 },
+    { "id": "1270000000000000011", "position": 1 }
+  ]
+}
+```
+
+Do not move `@everyone`. Its position is always `0`.
+
+## Delete a role
+
+<Endpoint method="DELETE" path="/servers/:serverId/roles/:roleId" />
+
+The bot needs Delete Roles. The role must be lower than the highest role of the bot. Fractura removes the role from all members. The response has status `204`.
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `50004` | 403 | The bot does not have the permission, or the role is not lower than the highest role of the bot. |
+| `50006` | 404 | The role does not exist. |
+| `50008` | 400 | The role cannot be deleted. It is `@everyone` or a managed role. |
+| `50010` | 400 | You tried to change the name, color, or hoist of `@everyone`. |

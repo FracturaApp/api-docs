@@ -1,0 +1,420 @@
+---
+title: Component reference
+description: The fields and limits of each component type.
+order: 25
+---
+
+Each component has a `type`. Each component can also have `id?`, a unique integer in the tree. Fractura sets `id` if you omit it.
+
+Read [Field notation](/docs/http#field-notation) for the meaning of `?` in the tables.
+
+## Component types
+
+| Type | Name | Message | Modal | Form |
+| --- | --- | --- | --- | --- |
+| `1` | [ActionRow](#actionrow) | Yes | Buttons only | Buttons only |
+| `2` | [Button](#button) | Yes | Yes | Yes |
+| `3` | [StringSelect](#stringselect) | Yes | Yes | Yes |
+| `4` | [TextInput](#textinput) | No | Yes | Yes |
+| `5` | [UserSelect](#userselect-roleselect-channelselect) | Yes | Yes | Yes |
+| `6` | [RoleSelect](#userselect-roleselect-channelselect) | Yes | Yes | Yes |
+| `8` | [ChannelSelect](#userselect-roleselect-channelselect) | Yes | Yes | Yes |
+| `9` | [Section](#section) | Yes | No | No |
+| `10` | [TextDisplay](#textdisplay) | Yes | Yes | Yes |
+| `12` | [MediaGallery](#mediagallery) | Yes | No | No |
+| `13` | [File](#file) | Yes | Yes | No |
+| `14` | [Separator](#separator) | Yes | No | Yes |
+| `17` | [Container](#container) | Yes | No | No |
+| `18` | [Label](#label) | No | Yes | Yes |
+| `19` | [FileUpload](#fileupload) | No | Yes | No |
+| `21` | [RadioGroup](#radiogroup-and-checkboxgroup) | No | Yes | No |
+| `22` | [CheckboxGroup](#radiogroup-and-checkboxgroup) | No | Yes | Yes |
+| `23` | [Checkbox](#checkbox) | No | Yes | Yes |
+| `24` | [DatePicker](#datepicker) | No | Yes | Yes |
+| `25` | [Form](#form) | Yes | No | No |
+| `28` | [FieldsGrid](#fieldsgrid) | Yes | Yes | No |
+| `29` | [Progress](#progress) | Yes | Yes | No |
+| `30` | [Collapsible](#collapsible) | Yes | Yes | No |
+| `31` | [Overflow](#overflow) | In a section | No | No |
+| `32` | [NumberInput](#numberinput) | No | Yes | Yes |
+| `33` | [Slider](#slider) | No | Yes | Yes |
+| `34` | [Rating](#rating) | No | Yes | Yes |
+| `35` | [TimePicker](#timepicker) | No | Yes | Yes |
+| `36` | [FieldGroup](#fieldgroup) | No | Yes | Yes |
+| `37` | [StringListInput](#stringlistinput) | No | Yes | Yes |
+| `38` | [ColorPicker](#colorpicker) | No | Yes | Yes |
+| `39` | [FileGallery](#filegallery) | Yes | Yes | No |
+| `40` | [Author](#author) | Yes | No | No |
+
+In a modal or a form, put each input in a [Label](#label).
+
+## Shared objects
+
+### Emoji
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id?` | ?string | The id of a custom emoji. |
+| `name` | string | The name of a custom emoji, or one Unicode emoji when there is no `id`. 1 to 64 characters. |
+| `animated?` | boolean | `true` for an animated custom emoji. |
+
+### Option
+
+Used by StringSelect, RadioGroup, and CheckboxGroup.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `label` | string | 1 to 80 characters. |
+| `value` | string | 1 to 100 characters. Must be unique in the component. |
+| `description?` | string | At most 150 characters. |
+| `emoji?` | object | An [emoji](#emoji). StringSelect only. |
+| `default?` | boolean | `true` selects the option at the start. |
+
+## Controls
+
+### ActionRow
+
+A row of 1 to 10 controls. In a message, a row holds buttons and selects. In a modal or a form, a row holds only buttons.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `components` | array | The controls in the row. |
+
+### Button
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `style` | integer | `1` Standard or `2` Link. |
+| `label` | string | 1 to 80 characters. |
+| `customId?` | string | Required for Standard. Not allowed for Link. |
+| `url?` | string | Required for Link. An `http` or `https` URL of at most 512 characters. |
+| `color?` | integer | A background color as an RGB integer. Standard only. |
+| `emoji?` | object | An [emoji](#emoji). |
+| `disabled?` | boolean | `true` shows the button but blocks clicks. |
+| `submit?` | boolean | `true` for the submit button of a [form](#form). |
+| `tooltip?` | string | At most 150 characters. |
+
+### StringSelect
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `options` | array | 1 to 25 [options](#option). |
+| `placeholder?` | string | At most 150 characters. |
+| `minValues?` | integer | 0 to 25. The default is 1. |
+| `maxValues?` | integer | 1 to 25. The default is 1. |
+| `disabled?` | boolean | `true` blocks changes. |
+| `required?` | boolean | In a modal or a form, `true` makes a selection necessary. |
+| `searchable?` | boolean | `true` adds a search box. |
+
+### UserSelect, RoleSelect, ChannelSelect
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `placeholder?` | string | At most 150 characters. |
+| `minValues?` | integer | 0 to 25. The default is 1. |
+| `maxValues?` | integer | 1 to 25. The default is 1. |
+| `defaultValues?` | array | At most 25 ids to select at the start. |
+| `disabled?` | boolean | `true` blocks changes. |
+| `required?` | boolean | In a modal or a form, `true` makes a selection necessary. |
+| `kind?` | integer | UserSelect only. `1` all users, `2` people only, `3` bots only. |
+| `allowedUsers?` | array | UserSelect only. 1 to 100 user ids. |
+| `allowedRoles?` | array | RoleSelect only. The role ids that the person can select. |
+| `channelTypes?` | array | ChannelSelect only. The [channel types](/docs/channels#channel-types) to show. |
+| `allowedChannels?` | array | ChannelSelect only. The channel ids that the person can select. |
+
+The values are ids. To get the objects, call the API.
+
+### Overflow
+
+A menu button with a list of actions. Put it in the `accessory` of a [Section](#section).
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `options` | array | 1 to 10 items. See below. |
+| `emoji?` | object | An [emoji](#emoji). |
+| `emojiPosition?` | string | `"start"` or `"end"`. |
+| `disabled?` | boolean | `true` blocks clicks. |
+| `tooltip?` | string | At most 150 characters. |
+
+Each item has these fields. Menus can nest 5 levels.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `label` | string | 1 to 80 characters. |
+| `value?` | string | 1 to 100 characters. Required when the item has no `options`. |
+| `options?` | array | A nested menu. Not allowed when the item has a `value`. |
+| `destructive?` | boolean | `true` shows the item in red. |
+
+The selected item `value` is in `componentData.values[0]`.
+
+## Layout
+
+### TextDisplay
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `content` | string | 1 to 4000 characters of [Markdown](/docs/markdown). |
+
+### Section
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `components` | array | 1 to 3 TextDisplay components. |
+| `accessory?` | object | One Button, File, or Overflow at the side. |
+
+### Separator
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `divider?` | boolean | `true` shows a line. |
+| `spacing?` | integer | `1` small or `2` large. |
+
+### Container
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `components` | array | At least 1 component. All message components are allowed except Container. |
+| `accentColor?` | ?integer | An RGB integer from `0` to `16777215`. |
+
+### Collapsible
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `label` | string | 1 to 80 characters. |
+| `components` | array | At least 1 TextDisplay, MediaGallery, Separator, FieldsGrid, File, or FileGallery. |
+| `defaultOpen?` | boolean | `true` shows the content at the start. |
+
+### FieldsGrid
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `fields` | array | 1 to 10 objects. Each has `name` (1 to 80 characters) and `value` (1 to 500 characters of Markdown). |
+| `columns?` | integer | `1` or `2`. |
+
+### Progress
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `value` | integer | 0 to 100. |
+| `label?` | string | Text above the bar. |
+| `color?` | integer | An RGB integer. |
+| `showValue?` | boolean | `true` shows the percentage. |
+
+### Author
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | string | 1 to 80 characters. |
+| `url?` | string | A link for the name. |
+| `imageUrl?` | string | An image URL of at most 2048 characters. |
+
+### MediaGallery
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `items` | array | 1 to 10 media items. See below. |
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `url` | string | At most 2048 characters. |
+| `alt?` | string | At most 80 characters. |
+| `width?` | integer | The width in pixels. |
+| `height?` | integer | The height in pixels. |
+
+### File
+
+Shows a file that the bot uploaded to the same channel. Read [Attachments](/docs/attachments).
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `attachmentId` | string | The attachment id. |
+| `width?` | integer | 64 to 640 pixels. |
+| `radius?` | integer | Corner radius, 0 to 32 pixels. |
+| `align?` | integer | `1` left, `2` center, or `3` right. |
+| `compact?` | boolean | `true` shows a small card. |
+
+### FileGallery
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `components` | array | 1 to 10 File components. |
+| `columns?` | integer | 1 to 4. |
+
+## Inputs
+
+### Label
+
+A label holds one input and its name.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `label` | string | 1 to 80 characters. |
+| `description?` | string | At most 150 characters. |
+| `component` | object | One input. |
+| `visibleWhen?` | object | Shows the label only when another input has a value. See below. |
+
+`visibleWhen` has `customId` and exactly one of these fields:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `equals?` | string | The value of the other input. |
+| `in?` | array | A list of 1 to 25 values. |
+| `checked?` | boolean | The state of a checkbox. |
+
+```json
+{
+  "type": 18,
+  "label": "Other reason",
+  "visibleWhen": { "customId": "reason", "equals": "other" },
+  "component": { "type": 4, "customId": "reason_text", "style": 1 }
+}
+```
+
+### FieldGroup
+
+Shows labels side by side.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `components` | array | 1 to 9 Label components. |
+| `label?` | string | A heading for the group. |
+| `description?` | string | Text under the heading. |
+| `columns?` | integer | 1 to 3. |
+
+### TextInput
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `style` | integer | `1` one line, or `2` paragraph. |
+| `placeholder?` | string | At most 150 characters. |
+| `value?` | string | Text at the start. At most 4000 characters. |
+| `minLength?` | integer | 0 to 4000. |
+| `maxLength?` | integer | 1 to 4000. |
+| `required?` | boolean | `true` makes the input necessary. |
+| `pattern?` | string | A regular expression of at most 200 characters. Fractura does not check the submitted value against it, so check the value in your bot. |
+| `patternError?` | string | The error text for `pattern`. At most 150 characters. |
+
+### NumberInput
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `value?` | number | The start value. |
+| `minValue?` | number | The smallest value. |
+| `maxValue?` | number | The largest value. |
+| `step?` | number | Greater than 0. |
+| `placeholder?` | string | At most 150 characters. |
+| `required?` | boolean | `true` makes a value necessary. |
+
+### Slider
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `minValue` | number | The smallest value. Must be less than `maxValue`. |
+| `maxValue` | number | The largest value. |
+| `step?` | number | Greater than 0. |
+| `value?` | number | The start value. |
+| `unit?` | string | Text after the value. At most 10 characters. |
+
+### Rating
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `scale?` | integer | 2 to 10. The default is 5. |
+| `value?` | integer | The start value. |
+| `required?` | boolean | `true` makes a rating necessary. |
+
+### Checkbox
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `label?` | string | At most 150 characters. |
+| `defaultChecked?` | boolean | `true` checks the box at the start. |
+| `required?` | boolean | `true` means the person must check the box. |
+
+### RadioGroup and CheckboxGroup
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `options` | array | 1 to 25 [options](#option). A RadioGroup can have only 1 default. |
+| `minValues?` | integer | CheckboxGroup only. |
+| `maxValues?` | integer | CheckboxGroup only. |
+| `required?` | boolean | `true` makes a selection necessary. |
+| `layout?` | integer | `1` list, `2` cards, or `3` grid. |
+
+### DatePicker
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `value?` | string | The start date, as `YYYY-MM-DD`. |
+| `minDate?` | string | The earliest date, as `YYYY-MM-DD`. |
+| `maxDate?` | string | The latest date, as `YYYY-MM-DD`. |
+| `placeholder?` | string | At most 150 characters. |
+| `required?` | boolean | `true` makes a date necessary. |
+
+### TimePicker
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `value?` | string | The start time, as `HH:MM` on a 24-hour clock. |
+| `minTime?` | string | The earliest time, as `HH:MM`. |
+| `maxTime?` | string | The latest time, as `HH:MM`. |
+| `minuteStep?` | integer | `1`, `5`, `10`, `15`, `30`, or `60`. |
+| `placeholder?` | string | At most 150 characters. |
+| `required?` | boolean | `true` makes a time necessary. |
+
+### StringListInput
+
+The person enters a list of short texts.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `values?` | array | At most 25 unique start values. Each has 1 to 100 characters. |
+| `minValues?` | integer | 0 to 25. |
+| `maxValues?` | integer | 1 to 25. |
+| `minLength?` | integer | The smallest length of each value, 1 to 100. |
+| `maxLength?` | integer | The largest length of each value, 1 to 100. |
+| `placeholder?` | string | At most 150 characters. |
+| `required?` | boolean | `true` makes a value necessary. |
+
+### ColorPicker
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `value?` | integer | An RGB integer from `0` to `16777215`. |
+| `required?` | boolean | `true` makes a color necessary. |
+
+### FileUpload
+
+Modal only.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `minValues?` | integer | 0 to 10. |
+| `maxValues?` | integer | 1 to 10. The default is 1. |
+| `accept?` | array | 1 to 10 MIME types, for example `image/*`. |
+| `required?` | boolean | `true` makes a file necessary. |
+
+The submit contains attachment ids in `values`. The files are in `interaction.attachments`.
+
+### Form
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `customId` | string | 1 to 100 characters. |
+| `components` | array | At least 2 components: Label, FieldGroup, TextDisplay, Separator, or an ActionRow with buttons. |
+
+A form needs at least one input and exactly one button with `"submit": true`. Read [Forms](/docs/components#forms).

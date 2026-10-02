@@ -1,0 +1,79 @@
+---
+title: Authentication
+description: Send the bot token with each request and each gateway connection.
+order: 3
+---
+
+The bot authenticates with its bot token. Get the token on the **Bot** page of the [developer portal](https://frta.dev). Read [Bot user](/docs/bot-user#bot-token).
+
+## HTTP requests
+
+Put the token in the `Authorization` header of each request. Send only the token. Do not add `Bot` or `Bearer` before it.
+
+```http
+Authorization: fra_...
+```
+
+<CodeGroup>
+
+```javascript
+const response = await fetch("https://fractura.org/api/users/@me", {
+  headers: { Authorization: process.env.BOT_TOKEN },
+});
+
+const bot = await response.json();
+console.log(bot.id, bot.username);
+```
+
+```python
+import asyncio
+import os
+
+import aiohttp
+
+
+async def main():
+    headers = {"Authorization": os.environ["BOT_TOKEN"]}
+    async with aiohttp.ClientSession(headers=headers) as http:
+        async with http.get("https://fractura.org/api/users/@me") as response:
+            bot = await response.json()
+            print(bot["id"], bot["username"])
+
+
+asyncio.run(main())
+```
+
+```curl
+curl https://fractura.org/api/users/@me \
+  -H "Authorization: $BOT_TOKEN"
+```
+
+</CodeGroup>
+
+## Gateway connections
+
+Send the token in the `Identify` event. Read [Connect to the gateway](/docs/connecting).
+
+```json
+{ "event": "Identify", "data": { "token": "fra_..." } }
+```
+
+## Routes for bots
+
+Bots can call only some routes. A route that does not accept bots returns code `10025`. Each page in these documents shows only routes that a bot can call.
+
+The interaction callback route accepts only bot tokens.
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `10007` | 401 | The `Authorization` header is missing. |
+| `20001` | 401 | The token is wrong, or somebody reset it. |
+| `10025` | 403 | The route does not accept bot tokens. |
+
+If you get `20001`, make sure that you copied the full token. If somebody reset the token in the portal, get the new token.
+
+## Bot tokens and OAuth2 tokens
+
+A bot token acts as the bot. An OAuth2 access token acts as a person who authorized your application, and uses the `Bearer` prefix. Do not send a bot token with `Bearer`. Read [OAuth2](/docs/oauth2).

@@ -1,0 +1,209 @@
+---
+title: HTTP API
+sidebarTitle: HTTP API
+description: Send requests, read responses, and handle errors.
+order: 40
+---
+
+The base URL of the API is:
+
+```text
+https://fractura.org/api
+```
+
+Send all requests over HTTPS. Send JSON bodies with the `Content-Type: application/json` header.
+
+## Authentication
+
+Put the bot token in the `Authorization` header. Do not add `Bot` or `Bearer` before the token. Read [Authentication](/docs/authentication).
+
+```http
+GET /api/users/@me HTTP/1.1
+Host: fractura.org
+Authorization: fra_...
+```
+
+## Make a request
+
+The examples in these documents use a small `api` helper. The helper sends the token, encodes the body, and raises an error for a failed request.
+
+<CodeGroup>
+
+```javascript
+const API_URL = "https://fractura.org/api";
+const TOKEN = process.env.BOT_TOKEN;
+
+async function api(method, path, body) {
+  const response = await fetch(API_URL + path, {
+    method,
+    headers: { Authorization: TOKEN, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(`${response.status} ${data.code}: ${data.message}`);
+  }
+
+  return data;
+}
+```
+
+```python
+import os
+
+import aiohttp
+
+API_URL = "https://fractura.org/api"
+TOKEN = os.environ["BOT_TOKEN"]
+
+_session = None
+
+
+class ApiError(Exception):
+    def __init__(self, status, data):
+        super().__init__(f"{status} {data.get('code')}: {data.get('message')}")
+        self.status = status
+        self.data = data
+
+
+async def api(method, path, body=None):
+    global _session
+    if _session is None:
+        _session = aiohttp.ClientSession(headers={"Authorization": TOKEN})
+
+    async with _session.request(method, API_URL + path, json=body) as response:
+        if response.status == 204:
+            return None
+        data = await response.json()
+        if response.status >= 400:
+            raise ApiError(response.status, data)
+        return data
+```
+
+</CodeGroup>
+
+Use the helper like this:
+
+<CodeGroup>
+
+```javascript
+const bot = await api("GET", "/users/@me");
+console.log(bot.username);
+```
+
+```python
+bot = await api("GET", "/users/@me")
+print(bot["username"])
+```
+
+```curl
+curl https://fractura.org/api/users/@me \
+  -H "Authorization: $BOT_TOKEN"
+```
+
+</CodeGroup>
+
+The Python helper needs `aiohttp`. Install it with `pip install aiohttp`. The JavaScript helper needs Node.js 22 or later, or Bun.
+
+## Ids
+
+Each object has an id. An id is a snowflake: a number of up to 20 digits.
+
+Ids are always JSON strings, for example `"1290000000000000000"`. Send ids as strings. Do not send them as JSON numbers.
+
+## Responses
+
+A successful response contains the object or the array that each page describes. A list is always a plain JSON array.
+
+Most `DELETE` requests return status `204` and no body.
+
+Fields in the response that are not documented can change. Do not depend on them.
+
+Bit fields on users, channels, members, and webhooks are decimal strings, for example `"8"`. Message `flags` is a number.
+
+## Field notation
+
+The field tables in these documents use `?` to show optional and nullable fields:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `name` | string | The field is always present. The value is never `null`. |
+| `name?` | string | The field can be absent. When it is present, the value is a string. |
+| `name` | ?string | The field is always present. The value is a string or `null`. |
+| `name?` | ?string | The field can be absent. When it is present, the value is a string or `null`. |
+
+In a request body, a field with `?` is optional. In a response, a field with `?` is not in all responses.
+
+## Errors
+
+A failed request returns a JSON body:
+
+```json
+{
+  "code": 50004,
+  "message": "You do not have permission to perform this action.",
+  "errors": {
+    "permissions": {
+      "code": "MissingPermissions",
+      "message": "Missing required permissions",
+      "missing": [{ "category": "2", "bits": "1" }]
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `code` | integer | A number that identifies the error. Use it in your code. |
+| `message` | string | Text for people. It can change. Do not use it in your code. |
+| `errors?` | object | Details for each field that is not valid. Each detail has a string `code` and a `message`. |
+
+Some errors have more top-level fields, for example `retryAfter` on a rate limit.
+
+### Error codes
+
+| Code | Status | Name | Cause |
+| --- | --- | --- | --- |
+| `10000` | 400 | ParseError | The body is not valid JSON. |
+| `10002` | 413 | PayloadTooLarge | The body is larger than 10 MB. |
+| `10003` | 404 | NotFound | The resource does not exist, or the bot is not a member of the server. |
+| `10006` | 400 | InvalidBody | A field in the body is not valid. Read `errors`. |
+| `10007` | 401 | Unauthorized | The token is missing. |
+| `10008` | 400 | NoFieldsToUpdate | The update body is empty. |
+| `10011` | 400 | InvalidQuery | A query parameter is not valid. |
+| `10013` | 429 | RateLimitExceeded | Read [Rate limits](/docs/rate-limits). |
+| `10025` | 403 | BotsNotAllowed | This route does not accept bot tokens. |
+| `10030` | 400 | InvalidParams | A path parameter is not valid. |
+| `20001` | 401 | InvalidToken | The token is not valid. |
+| `40006` | 404 | UserNotFound | The user does not exist. |
+| `50000` | 404 | UnknownServer | The server does not exist. |
+| `50004` | 403 | MissingPermissions | The bot does not have a permission. `errors.permissions.missing` lists it. |
+| `50005` | 404 | UnknownChannel | The channel does not exist, or the bot cannot see it. |
+| `50006` | 404 | UnknownRole | The role does not exist. |
+| `50007` | 404 | UnknownMember | The user is not a member of the server. |
+| `50033` | 404 | UnknownEmoji | The emoji does not exist. |
+| `61000` | 404 | UnknownAttachment | The attachment does not exist. |
+| `80000` | 404 | UnknownMessage | The message does not exist. |
+| `80001` | 403 | CannotSendMessages | The bot cannot send messages in this channel. |
+| `80002` | 400 | EmptyMessage | The message has no content, attachments, or components. |
+| `80011` | 429 | SlowmodeRateLimited | The channel has slowmode. Read `retryAfter`. |
+| `90001` | 403 | MissingCapability | The application does not have the necessary capability. |
+| `90002` | 404 | UnknownInteraction | The interaction is unknown or past its deadline. |
+| `90003` | 400 | InteractionAlreadyAcknowledged | The interaction already has a callback. |
+| `90007` | 400 | InvalidComponents | The component tree is not valid. |
+| `90008` | 404 | ApplicationNotInstalled | The application is not installed in the server. |
+| `90009` | 400 | InvalidCallbackType | The callback type is not valid for this interaction. |
+
+Each resource page lists the other errors of its routes.
+
+<Note>
+
+A missing token and a wrong token are different errors. Code `10007` means that the `Authorization` header is missing. Code `20001` means that the token is wrong, expired, or reset.
+
+</Note>

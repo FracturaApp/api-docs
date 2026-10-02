@@ -1,0 +1,117 @@
+---
+title: Threads
+description: Start threads from messages, and join, change, and list them.
+order: 52
+---
+
+A thread is a channel that starts from a message in a text channel. A thread has type `4` (public) or `5` (private). Members of the parent channel can see a public thread. Only thread members and moderators can see a private thread.
+
+## Thread metadata
+
+A thread channel has these fields in addition to the [channel fields](/docs/channels#channel-object):
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `ownerId` | string | The user who started the thread. |
+| `threadMetadata` | object | The fields below. |
+| `threadMetadata.messageId` | string | The message that the thread started from. |
+| `threadMetadata.archived` | boolean | `true` if the thread is archived. |
+| `threadMetadata.archivedAt` | ?string | The time of the archive. |
+| `threadMetadata.archiveDuration` | integer | Minutes without activity before Fractura archives the thread. |
+| `threadMetadata.locked` | boolean | `true` if only moderators can unarchive the thread. |
+| `threadMetadata.messageCount` | integer | The number of messages. |
+| `threadMetadata.memberCount` | integer | The number of members. |
+
+## Start a thread
+
+<Endpoint method="POST" path="/channels/:channelId/messages/:messageId/threads" />
+
+The parent must be a text channel. The bot needs View Channels and Create Threads. A message can have only one thread.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | string | 1 to 100 characters. |
+| `archiveDuration?` | integer | `60`, `1440`, `4320`, or `10080` minutes. |
+| `private?` | boolean | `true` makes a private thread. |
+
+<CodeGroup>
+
+```javascript
+const thread = await api("POST", `/channels/${channelId}/messages/${messageId}/threads`, {
+  name: `Ticket #${ticketNumber}`,
+  archiveDuration: 4320,
+});
+
+await api("POST", `/channels/${thread.id}/messages`, {
+  content: "A moderator will answer here.",
+});
+```
+
+```python
+thread = await api("POST", f"/channels/{channel_id}/messages/{message_id}/threads", {
+    "name": f"Ticket #{ticket_number}",
+    "archiveDuration": 4320,
+})
+
+await api("POST", f"/channels/{thread['id']}/messages", {
+    "content": "A moderator will answer here.",
+})
+```
+
+</CodeGroup>
+
+Send messages to a thread with the normal [message routes](/docs/messages). Use the thread id as the channel id.
+
+## List threads
+
+<Endpoint method="GET" path="/channels/:channelId/threads" />
+
+Returns the threads of a text channel, from the newest to the oldest. Add the query `archived=true` to include archived threads.
+
+<Endpoint method="GET" path="/users/@me/threads" />
+
+Returns the threads that the bot is a member of.
+
+## Change a thread
+
+<Endpoint method="PATCH" path="/channels/:channelId" />
+
+The owner of the thread can change it. Other members need Manage Threads. Manage Threads needs the `admin_actions` grant.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name?` | string | 1 to 100 characters. |
+| `archived?` | boolean | `true` archives the thread. `false` opens it again. |
+| `archiveDuration?` | integer | `60`, `1440`, `4320`, or `10080` minutes. |
+| `locked?` | boolean | Needs Manage Threads. |
+
+## Thread members
+
+<Endpoint method="GET" path="/channels/:channelId/thread-members" />
+
+Returns the members of the thread. Each item has `user` and `joinedAt`.
+
+<Endpoint method="PUT" path="/channels/:channelId/thread-members/@me" />
+
+The bot joins a public thread. The response has status `204`.
+
+<Endpoint method="DELETE" path="/channels/:channelId/thread-members/@me" />
+
+The bot leaves the thread. The response has status `204`.
+
+## Delete a thread
+
+<Endpoint method="DELETE" path="/channels/:channelId" />
+
+The owner of the thread can delete it. Other members need Manage Threads.
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `80013` | 400 | The message already has a thread. |
+| `80014` | 400 | `archiveDuration` is not an allowed value. |
+| `80015` | 400 | The thread is archived. |
+| `80016` | 400/403 | The thread is locked. |
+| `80018` | 400 | The bot is already a member of the thread. |
+| `80019` | 400 | The bot is not a member of the thread. |

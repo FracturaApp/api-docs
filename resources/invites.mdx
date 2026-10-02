@@ -1,0 +1,87 @@
+---
+title: Invites
+description: Create, list, and delete server invites.
+order: 65
+---
+
+An invite is a code that lets a person join a server. The invite URL has this format: `https://app.fractura.org/invite/CODE`.
+
+## Invite object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `code` | string | The invite code. |
+| `serverId` | string | The server id. |
+| `channelId` | ?string | The channel that the person sees first. |
+| `inviterId` | ?string | The user who made the invite. |
+| `uses` | integer | The number of times people used the invite. |
+| `maxUses` | integer | The maximum number of uses. `0` means no limit. |
+| `expiresAt` | ?string | ISO 8601 time. `null` means the invite does not expire. |
+| `createdAt` | string | ISO 8601 time. |
+| `channel?` | object | Only with the query `include=channel`. |
+| `inviter?` | object | Only with the query `include=inviter`. |
+
+## Create an invite
+
+<Endpoint method="POST" path="/servers/:serverId/invites" />
+
+The bot needs Create Invites. This permission does not need the `admin_actions` grant.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `channelId?` | string | A channel in the server. |
+| `expiresAt?` | ?string | A time in the future. |
+| `maxUses?` | integer | The default is `0`, no limit. |
+
+<CodeGroup>
+
+```javascript
+const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+const invite = await api("POST", `/servers/${serverId}/invites`, {
+  maxUses: 1,
+  expiresAt: tomorrow,
+});
+
+console.log(`https://app.fractura.org/invite/${invite.code}`);
+```
+
+```python
+from datetime import datetime, timedelta, timezone
+
+tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+
+invite = await api("POST", f"/servers/{server_id}/invites", {
+    "maxUses": 1,
+    "expiresAt": tomorrow,
+})
+
+print(f"https://app.fractura.org/invite/{invite['code']}")
+```
+
+</CodeGroup>
+
+## List invites
+
+<Endpoint method="GET" path="/servers/:serverId/invites" />
+
+Returns the invites that did not expire. With Manage Invites, the list contains all invites. Without it, the list contains only the invites of the bot.
+
+Add `?include=channel,inviter` to get the channel and the inviter objects.
+
+<Endpoint method="GET" path="/servers/:serverId/invites/:inviteCode" />
+
+Returns one invite. The bot needs Manage Invites for an invite that another user made.
+
+## Delete an invite
+
+<Endpoint method="DELETE" path="/servers/:serverId/invites/:inviteCode" />
+
+The bot can delete its own invites. To delete an invite from another user, the bot needs Manage Invites. The response has status `204`.
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `50020` | 404 | The invite does not exist. |
+| `50004` | 403 | The bot does not have the permission. |

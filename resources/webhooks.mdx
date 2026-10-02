@@ -1,0 +1,134 @@
+---
+title: Webhooks
+description: Create incoming webhooks and post messages through them.
+order: 55
+---
+
+An incoming webhook posts messages into one channel. Anyone with the webhook URL can post. The URL contains a secret token, so a service can post without a bot token.
+
+To manage webhooks, the bot needs Manage Webhooks. The install must grant **Receive webhooks** (`webhooks`).
+
+## Webhook object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The webhook id. |
+| `channelId` | string | The channel where the webhook posts. |
+| `serverId` | string | The server id. |
+| `user` | object | The webhook user. This user is the author of the messages. |
+| `creator` | object | The user who created the webhook. |
+| `flags` | string | `1` if a bot created the webhook. |
+| `createdAt`, `updatedAt` | string | ISO 8601 times. |
+
+## Create a webhook
+
+<Endpoint method="POST" path="/channels/:channelId/webhooks" />
+
+The channel must be a text channel. You cannot create a webhook in a thread or a direct message. A channel can have 15 webhooks.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | string | 1 to 80 characters. Cannot be `everyone` or `here`. |
+| `avatarAttachmentId?` | ?string | An icon [attachment](/docs/attachments) that the bot uploaded. |
+
+The response contains the webhook, `token`, and `url`.
+
+<Caution>
+
+Store the `token` or the `url` immediately. A list of webhooks does not contain the token. If you lose it, regenerate it.
+
+</Caution>
+
+The token has this format: `frac_whk_WEBHOOK_ID_SECRET`. The URL has this format:
+
+```text
+https://fractura.org/api/webhooks/WEBHOOK_ID/frac_whk_WEBHOOK_ID_SECRET
+```
+
+## Post a message
+
+<Endpoint method="POST" path="/webhooks/:webhookId/:token" />
+
+Do not send the `Authorization` header. If you send it, the request fails with code `10007`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `content` | string | 1 to 4000 characters. |
+| `allowedMentions?` | object | Read [Allowed mentions](/docs/messages#allowed-mentions). |
+| `flags?` | integer | Only `16`. |
+
+| Query | Description |
+| --- | --- |
+| `threadId?` | Posts into a thread of the webhook channel. |
+
+A webhook message cannot have attachments, components, or a reply. The response has status `201` and contains the message.
+
+<CodeGroup>
+
+```javascript
+await fetch(process.env.WEBHOOK_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ content: "Deploy of `api` finished in 3 min 12 s." }),
+});
+```
+
+```python
+import os
+
+import aiohttp
+
+async def post_deploy_notice():
+    async with aiohttp.ClientSession() as http:
+        async with http.post(
+            os.environ["WEBHOOK_URL"],
+            json={"content": "Deploy of `api` finished in 3 min 12 s."},
+        ) as response:
+            response.raise_for_status()
+```
+
+```curl
+curl -X POST "$WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Deploy of `api` finished in 3 min 12 s."}'
+```
+
+</CodeGroup>
+
+One webhook can post 60 messages each minute. All senders of the webhook share this limit.
+
+## Manage webhooks
+
+<Endpoint method="GET" path="/channels/:channelId/webhooks" />
+
+Returns the webhooks of the channel, without tokens.
+
+<Endpoint method="PATCH" path="/webhooks/:webhookId" />
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name?` | string | 1 to 80 characters. |
+| `avatarAttachmentId?` | ?string | An icon attachment. `null` removes the avatar. |
+
+Only a bot can change a webhook that a bot created.
+
+<Endpoint method="POST" path="/webhooks/:webhookId/regenerate-token" />
+
+Makes a new token. The response contains the webhook, `token`, and `url`. The old URL stops working immediately.
+
+<Endpoint method="DELETE" path="/webhooks/:webhookId" />
+
+Deletes the webhook. The messages of the webhook stay. The response has status `204`.
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `10007` | 401 | The token in the URL is wrong, or the request has an `Authorization` header. |
+| `50026` | 404 | The webhook does not exist. |
+| `50027` | 400 | The name is not allowed. |
+| `50028` | 400 | The channel is a direct message. |
+| `50029` | 400 | The channel is a thread. |
+| `50030` | 400 | The channel already has 15 webhooks. |
+| `50031` | 400 | `threadId` is not a thread of the webhook channel. |
+| `50032` | 403 | A person tried to change a webhook that a bot created. |

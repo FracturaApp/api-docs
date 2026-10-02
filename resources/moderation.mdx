@@ -1,0 +1,92 @@
+---
+title: Moderation
+description: Time out, kick, and ban members.
+order: 63
+---
+
+All moderation permissions need the `admin_actions` grant. The target member must have a highest role that is lower than the highest role of the bot. The bot cannot kick or ban the server owner.
+
+## Timeouts
+
+A member with a timeout can only view channels and read message history. Set `timeoutUntil` with [Change a member](/docs/members#change-a-member).
+
+<Endpoint method="PATCH" path="/servers/:serverId/members/:userId" />
+
+The bot needs Timeout Members.
+
+<CodeGroup>
+
+```javascript
+const tenMinutes = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+await api("PATCH", `/servers/${serverId}/members/${userId}`, {
+  timeoutUntil: tenMinutes,
+});
+```
+
+```python
+from datetime import datetime, timedelta, timezone
+
+ten_minutes = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+
+await api("PATCH", f"/servers/{server_id}/members/{user_id}", {
+    "timeoutUntil": ten_minutes,
+})
+```
+
+</CodeGroup>
+
+To end a timeout, send `"timeoutUntil": null`. Members with Administrator are not affected by a timeout.
+
+## Kick a member
+
+<Endpoint method="DELETE" path="/servers/:serverId/kick/:userId" />
+
+The bot needs Kick Members. The member can join again with an invite. The response has status `204`.
+
+## Ban a user
+
+<Endpoint method="PUT" path="/servers/:serverId/bans/:userId" />
+
+The bot needs Ban Members. Fractura removes the user from the server and prevents a new join. You can ban a user who is not a member.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `reason?` | string | At most 512 characters. |
+
+The response contains the ban.
+
+<Endpoint method="DELETE" path="/servers/:serverId/bans/:userId" />
+
+Removes the ban. The response has status `200` and contains the removed ban.
+
+<Endpoint method="GET" path="/servers/:serverId/bans" />
+
+Returns the bans. Use `limit` (1 to 1000, default 100), `after`, and `before` with ban ids, the same as [List members](/docs/members#list-members).
+
+### Ban object
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | The ban id. |
+| `serverId` | string | The server id. |
+| `userId` | string | The banned user. |
+| `moderatorId` | ?string | The user who made the ban. |
+| `reason` | ?string | The reason. |
+| `createdAt` | string | ISO 8601 time. |
+| `user` | ?object | The banned user. |
+| `moderator` | ?object | The moderator. |
+
+## Errors
+
+| Code | Status | Cause |
+| --- | --- | --- |
+| `50004` | 403 | The bot does not have the permission, or the target is not lower than the bot. |
+| `50007` | 404 | The user is not a member. |
+| `50009` | 400 | The bot tried to time out itself. |
+| `50013` | 400 | The bot tried to ban itself. |
+| `50014` | 400 | The target is the server owner. |
+| `50015` | 400 | The user is already banned. |
+| `50016` | 404 | The user is not banned. |
+| `50017` | 400 | The bot tried to kick itself. |
+| `50018` | 400 | The target is the server owner. |

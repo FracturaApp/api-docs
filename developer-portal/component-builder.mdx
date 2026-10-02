@@ -1,0 +1,64 @@
+---
+title: Component builder
+description: Design messages and modals, check them, and copy the JSON.
+order: 15
+---
+
+The [component builder](/component-builder) is a visual editor for [message components](/docs/components) and [modals](/docs/modals). You do not need to sign in to use it.
+
+## Layout
+
+| Area | Use |
+| --- | --- |
+| Tabs | **Message** edits a message. Each other tab edits one modal page. Select **+** to add a modal page. |
+| **Structure** | The tree of components. Use **Add component** to add a component. Drag a row to move it. |
+| Editor | **Preview** shows the result. **JSON** shows the payload. |
+| **Inspector** | The fields of the selected component. |
+
+On a small screen, a switch at the top shows one area at a time.
+
+The counters at the top show the number of components (limit 40) and the size of the JSON (limit 30720 bytes). A counter is red when you are over the limit.
+
+## Build a message
+
+1. Open the **Message** tab.
+2. Select **Add component**. The menu shows only the components that are allowed at that place.
+3. Select the component in **Structure**. Set its fields in **Inspector**.
+4. Look at the result in **Preview**.
+5. Select **Copy JSON**.
+
+The JSON for a message has this format:
+
+```json
+{ "components": [] }
+```
+
+Put the `components` array in a [message](/docs/messages#create-a-message) or in an [interaction callback](/docs/responding).
+
+## Build a modal
+
+1. Select **+** to add a modal page, or open a modal tab.
+2. Make sure that no component is selected. **Inspector** then shows **Modal settings**.
+3. Set **Title**, **Custom ID**, and **Size**. To show steps, select **Add step indicator**.
+4. Add inputs. The builder puts each input in a label for you.
+5. Select **Copy JSON**.
+
+The JSON for a modal contains `customId`, `title`, `size`, `steps`, and `components`. Use it as the `data` of a [modal callback](/docs/modals#open-a-modal).
+
+In **Preview**, you can fill in the modal and select **Submit**. The preview then shows the fields that your bot would receive.
+
+## Import JSON
+
+1. Open the tab that you want to replace.
+2. Open **JSON**.
+3. Select **Edit JSON**.
+4. Paste a components array, an object with `components`, or the data of a modal.
+5. Select **Apply**.
+
+If the JSON is not valid, the builder shows the errors and does not change the tab.
+
+## Validation
+
+The builder uses the same rules as the API. If the tree is not valid, the builder shows each problem and marks the components with errors in **Structure**.
+
+Your work stays in your browser. Select **Reset** to start again.
